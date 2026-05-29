@@ -1,0 +1,2272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Spendwise">
+<meta name="theme-color" content="#1a73e8">
+<meta name="description" content="Personal expense tracker — track, categorise and analyse your spending.">
+<link rel="manifest" href="manifest.json">
+<!-- Apple touch icon (inline SVG→PNG not possible, use a simple data URI placeholder) -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Spendwise</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+<style>
+/* ─── TOKENS ─────────────────────────────── */
+:root {
+  --primary:       #1a73e8;
+  --primary-dark:  #1557b0;
+  --primary-light: #e8f0fe;
+  --green:         #34a853;
+  --yellow:        #f9ab00;
+  --red:           #ea4335;
+  --surface:       #ffffff;
+  --surface-2:     #f8f9fa;
+  --surface-3:     #f1f3f4;
+  --ink:           #202124;
+  --ink-2:         #5f6368;
+  --ink-3:         #9aa0a6;
+  --border:        #e0e0e0;
+  --sh1: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+  --sh2: 0 3px 6px rgba(0,0,0,.10), 0 2px 4px rgba(0,0,0,.08);
+  --sh3: 0 10px 30px rgba(0,0,0,.12);
+  --r:    14px;
+  --rsm:  10px;
+  --rlg:  22px;
+  --nav-h: 64px;       /* bottom nav height */
+  --top-h: 60px;       /* top bar height */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+/* ─── RESET ──────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { height: 100%; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--surface-2);
+  color: var(--ink);
+  min-height: 100%;
+  overscroll-behavior: none;
+}
+
+/* ─── TOP BAR ────────────────────────────── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--top-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 16px;
+  gap: 10px;
+  z-index: 100;
+  box-shadow: var(--sh1);
+}
+.topbar-logo {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 18px; font-weight: 700; color: var(--ink);
+}
+.topbar-logo .logo-dot {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+}
+.topbar-logo .logo-dot .material-icons-round { font-size: 17px; color: white; }
+.topbar-spacer { flex: 1; }
+.topbar-month {
+  display: flex; align-items: center; gap: 2px;
+  background: var(--surface-3);
+  border-radius: 24px;
+  padding: 4px 10px;
+  font-size: 13px; font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+.topbar-month .material-icons-round { font-size: 16px; }
+.topbar-month span { min-width: 76px; text-align: center; }
+.topbar-add {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--primary); color: white;
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.topbar-add .material-icons-round { font-size: 22px; }
+
+/* ─── SCROLL AREA ────────────────────────── */
+.scroll-area {
+  padding-top: calc(var(--top-h) + 12px);
+  padding-bottom: calc(var(--nav-h) + var(--safe-b) + 16px);
+  padding-left: 14px;
+  padding-right: 14px;
+  min-height: 100vh;
+}
+
+/* ─── BOTTOM NAV ─────────────────────────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: calc(var(--nav-h) + var(--safe-b));
+  padding-bottom: var(--safe-b);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  z-index: 100;
+  box-shadow: 0 -2px 8px rgba(0,0,0,.06);
+}
+.nav-tab {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  color: var(--ink-3);
+  font-size: 11px; font-weight: 500;
+  transition: color .15s;
+  padding: 8px 0 4px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.nav-tab .material-icons-round { font-size: 22px; transition: transform .15s; }
+.nav-tab.active { color: var(--primary); }
+.nav-tab.active .material-icons-round { transform: scale(1.1); }
+.nav-tab .nav-pip {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--primary);
+  opacity: 0; transition: opacity .15s;
+  margin-top: -2px;
+}
+.nav-tab.active .nav-pip { opacity: 1; }
+
+/* ─── PAGE ───────────────────────────────── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ─── REMINDER BANNER ────────────────────── */
+.reminder {
+  background: #fff8e1;
+  border-left: 4px solid #f9ab00;
+  border-radius: var(--rsm);
+  padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-bottom: 14px;
+  font-size: 13px; line-height: 1.5;
+}
+.reminder .material-icons-round { color: #f9ab00; font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.reminder strong { color: #e65100; }
+.reminder-close { margin-left: auto; color: var(--ink-3); cursor: pointer; flex-shrink: 0; }
+
+/* ─── CARD ───────────────────────────────── */
+.card {
+  background: var(--surface);
+  border-radius: var(--r);
+  box-shadow: var(--sh1);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.card-head {
+  padding: 14px 16px 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--surface-3);
+}
+.card-title { font-size: 14px; font-weight: 600; }
+.card-body { padding: 14px 16px; }
+
+/* ─── STAT STRIP ─────────────────────────── */
+.stat-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.stat-card {
+  background: var(--surface);
+  border-radius: var(--r);
+  box-shadow: var(--sh1);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--accent, var(--primary));
+  border-radius: var(--r) var(--r) 0 0;
+}
+.stat-label { font-size: 11px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+.stat-val { font-size: 22px; font-weight: 700; color: var(--ink); font-family: 'DM Mono', monospace; line-height: 1.1; }
+.stat-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+.stat-full { grid-column: 1 / -1; }
+
+/* ─── BAR CHART ──────────────────────────── */
+.bar-list { display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: flex; align-items: center; gap: 10px; }
+.bar-lbl { font-size: 12px; color: var(--ink-2); width: 100px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.bar-track { flex: 1; height: 22px; background: var(--surface-3); border-radius: 11px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 11px; display: flex; align-items: center; padding-left: 8px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+.bar-fill span { font-size: 10px; font-weight: 700; color: rgba(255,255,255,.9); white-space: nowrap; }
+.bar-amt { font-size: 12px; font-weight: 600; font-family: 'DM Mono', monospace; color: var(--ink-2); width: 72px; flex-shrink: 0; text-align: right; }
+
+/* ─── DONUT ──────────────────────────────── */
+.donut-wrap { display: flex; align-items: center; gap: 16px; }
+.donut-legend { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+.leg-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.leg-name { flex: 1; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leg-pct { font-weight: 700; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-2); }
+
+/* ─── TREND ──────────────────────────────── */
+.trend-wrap { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
+.trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: flex-end; }
+.trend-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 3px; }
+.trend-mo { font-size: 9px; color: var(--ink-3); font-weight: 500; }
+.trend-amt { font-size: 8px; color: var(--ink-3); font-family: 'DM Mono', monospace; }
+
+/* ─── EXPENSE ITEM ───────────────────────── */
+.exp-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--surface-3);
+  animation: fadeUp .2s ease;
+}
+.exp-item:last-child { border-bottom: none; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(5px); } }
+.exp-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.exp-info { flex: 1; min-width: 0; }
+.exp-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.exp-meta { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.exp-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.exp-amt { font-size: 15px; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--red); }
+.exp-actions { display: flex; gap: 2px; }
+.exp-actions button {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: none; background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--ink-3);
+}
+.exp-actions button .material-icons-round { font-size: 15px; }
+.exp-actions .del { color: var(--red); }
+
+/* Group date header */
+.date-header {
+  font-size: 11px; font-weight: 700; color: var(--ink-3);
+  text-transform: uppercase; letter-spacing: .6px;
+  padding: 10px 0 4px;
+}
+
+/* ─── CHIPS ──────────────────────────────── */
+.chips-wrap { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  padding: 7px 14px; border-radius: 20px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; border: 1.5px solid var(--border);
+  color: var(--ink-2); background: var(--surface);
+  transition: all .15s; display: flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.chip:hover { border-color: var(--primary); color: var(--primary); }
+.chip.sel { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+
+/* ─── FORM ───────────────────────────────── */
+.form-group { margin-bottom: 16px; }
+.form-label { font-size: 11px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; display: block; }
+.form-input {
+  width: 100%; padding: 12px 14px;
+  border: 1.5px solid var(--border); border-radius: var(--rsm);
+  font-size: 15px; font-family: 'DM Sans', sans-serif;
+  color: var(--ink); background: var(--surface);
+  outline: none; transition: border-color .15s;
+  appearance: none;
+}
+.form-input:focus { border-color: var(--primary); }
+.form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235f6368' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 38px;
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.input-wrap { position: relative; }
+.input-prefix-sym {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 15px; color: var(--ink-2); font-weight: 600; pointer-events: none;
+}
+.input-wrap .form-input { padding-left: 34px; }
+
+/* ─── MODAL ──────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 200;
+  display: flex; align-items: flex-end;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.overlay.open { opacity: 1; pointer-events: all; }
+.sheet {
+  background: var(--surface);
+  border-radius: var(--rlg) var(--rlg) 0 0;
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  transform: translateY(100%);
+  transition: transform .25s cubic-bezier(.4,0,.2,1);
+  padding-bottom: calc(20px + var(--safe-b));
+}
+.overlay.open .sheet { transform: none; }
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border); margin: 10px auto 0;
+}
+.sheet-head {
+  padding: 14px 20px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.sheet-title { font-size: 17px; font-weight: 700; }
+.sheet-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: var(--surface-3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--ink-2);
+}
+.sheet-body { padding: 16px 20px; }
+.sheet-footer {
+  padding: 12px 20px 0;
+  display: flex; gap: 10px; justify-content: flex-end;
+  border-top: 1px solid var(--border);
+}
+
+/* Desktop: center sheet as dialog */
+@media (min-width: 600px) {
+  .overlay { align-items: center; justify-content: center; }
+  .sheet {
+    border-radius: var(--rlg);
+    width: 480px; max-width: 95vw;
+    transform: translateY(20px) scale(.97);
+  }
+  .overlay.open .sheet { transform: none; }
+  .sheet-handle { display: none; }
+}
+
+/* ─── BUTTONS ────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 11px 22px; border-radius: 24px;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; border: none;
+  transition: all .15s; font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-outlined { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
+.btn-outlined:hover { background: var(--primary-light); }
+.btn-text { background: transparent; color: var(--primary); padding: 8px 12px; }
+.btn-ghost { background: var(--surface-3); color: var(--ink-2); }
+.btn-danger { background: var(--red); color: white; }
+.btn .material-icons-round { font-size: 17px; }
+.btn-full { width: 100%; justify-content: center; }
+.btn-icon-round {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: none; background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-2); transition: background .15s;
+}
+.btn-icon-round:hover { background: var(--surface-3); }
+.btn-icon-round .material-icons-round { font-size: 20px; }
+
+/* ─── TABS ───────────────────────────────── */
+.tabs {
+  display: flex; overflow-x: auto; gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab-btn {
+  padding: 11px 18px; white-space: nowrap;
+  font-size: 13px; font-weight: 600; color: var(--ink-3);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all .15s; margin-bottom: -1px;
+}
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* ─── FILTER ROW ─────────────────────────── */
+.filter-row {
+  display: flex; gap: 8px; overflow-x: auto;
+  padding-bottom: 2px; margin-bottom: 10px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.filter-row::-webkit-scrollbar { display: none; }
+.filter-chip {
+  padding: 6px 14px; border-radius: 16px; white-space: nowrap;
+  font-size: 12px; font-weight: 600;
+  border: 1.5px solid var(--border); color: var(--ink-2);
+  cursor: pointer; flex-shrink: 0; background: var(--surface);
+  transition: all .15s;
+}
+.filter-chip.sel { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+
+/* ─── SEARCH ─────────────────────────────── */
+.search-wrap {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-3); border-radius: 12px;
+  padding: 9px 14px; margin-bottom: 10px;
+  border: 1.5px solid transparent; transition: border-color .15s;
+}
+.search-wrap:focus-within { border-color: var(--primary); background: var(--surface); }
+.search-wrap .material-icons-round { font-size: 18px; color: var(--ink-3); flex-shrink: 0; }
+.search-wrap input {
+  flex: 1; border: none; background: none; outline: none;
+  font-size: 14px; font-family: 'DM Sans', sans-serif; color: var(--ink);
+}
+
+/* ─── EMPTY STATE ────────────────────────── */
+.empty {
+  text-align: center; padding: 40px 20px; color: var(--ink-3);
+}
+.empty .material-icons-round { font-size: 44px; margin-bottom: 10px; }
+.empty p { font-size: 13px; }
+
+/* ─── TOGGLE ─────────────────────────────── */
+.toggle-wrap { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--surface); border-radius: var(--rsm); box-shadow: var(--sh1); margin-bottom: 8px; }
+.toggle-info h4 { font-size: 14px; font-weight: 500; }
+.toggle-info p { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.toggle {
+  width: 46px; height: 26px; background: var(--border); border-radius: 13px;
+  position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--primary); }
+.toggle::after {
+  content:''; position:absolute; top:3px; left:3px;
+  width:20px; height:20px; background:white; border-radius:50%;
+  box-shadow: var(--sh1); transition: transform .2s;
+}
+.toggle.on::after { transform: translateX(20px); }
+
+/* ─── CAT ITEM ───────────────────────────── */
+.cat-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; background: var(--surface);
+  border-radius: var(--rsm); box-shadow: var(--sh1); margin-bottom: 8px;
+}
+.cat-emoji-badge { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.cat-info { flex: 1; }
+.cat-name-t { font-size: 14px; font-weight: 500; }
+.cat-count { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+
+/* ─── EXPORT PREVIEW ─────────────────────── */
+.export-pre {
+  background: var(--surface-3); border-radius: var(--rsm);
+  padding: 14px; font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--ink-2); white-space: pre;
+  overflow-x: auto; max-height: 260px; overflow-y: auto;
+  border: 1px solid var(--border); line-height: 1.7;
+}
+
+/* ─── SETTINGS SECTION ───────────────────── */
+.settings-section { margin-bottom: 24px; }
+.settings-label { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; padding-left: 4px; }
+
+/* ─── TOAST ──────────────────────────────── */
+.toast-container { position: fixed; bottom: calc(var(--nav-h) + var(--safe-b) + 12px); left: 50%; transform: translateX(-50%); z-index: 500; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+.toast {
+  background: #323232; color: white;
+  padding: 10px 18px; border-radius: 24px;
+  font-size: 13px; font-weight: 500; box-shadow: var(--sh3);
+  animation: toastIn .25s ease; white-space: nowrap;
+  display: flex; align-items: center; gap: 8px;
+}
+.toast .material-icons-round { font-size: 16px; }
+.toast.ok { background: #1e7e34; }
+.toast.err { background: #c62828; }
+@keyframes toastIn { from { opacity:0; transform:translateY(10px); } }
+
+/* ─── DESKTOP LAYOUT ─────────────────────── */
+@media (min-width: 700px) {
+  .scroll-area { max-width: 700px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+  body { background: #e8eaed; }
+  .topbar { max-width: 700px; left: 50%; transform: translateX(-50%); border-radius: 0 0 0 0; }
+  .bottom-nav { max-width: 700px; left: 50%; transform: translateX(-50%); border-radius: var(--r) var(--r) 0 0; border: 1px solid var(--border); }
+  .stat-strip { grid-template-columns: repeat(4, 1fr); }
+  .stat-full { grid-column: auto; }
+}
+
+/* ─── MISC ───────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+.text-link { color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <div class="topbar-logo">
+    <div class="logo-dot"><span class="material-icons-round">account_balance_wallet</span></div>
+    Spendwise
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-month">
+    <span class="material-icons-round" onclick="changeMonth(-1)" style="cursor:pointer">chevron_left</span>
+    <span id="monthLabel">May 2026</span>
+    <span class="material-icons-round" onclick="changeMonth(1)" style="cursor:pointer">chevron_right</span>
+  </div>
+  <button class="topbar-add" onclick="openAddSheet()" aria-label="Add Expense">
+    <span class="material-icons-round">add</span>
+  </button>
+</header>
+
+<!-- PAGES -->
+<div class="scroll-area">
+
+  <!-- ── DASHBOARD ── -->
+  <div class="page active" id="page-home">
+    <div class="reminder" id="reminderEl" style="display:none">
+      <span class="material-icons-round">notifications_active</span>
+      <div><strong>Reminder!</strong> No expenses logged <span id="reminderMsg">today</span>.</div>
+      <span class="material-icons-round reminder-close" onclick="this.closest('.reminder').style.display='none'">close</span>
+    </div>
+    <div class="stat-strip" id="statStrip"></div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">By Category</span>
+        <span id="topCatLabel" style="font-size:12px;color:var(--ink-3)"></span>
+      </div>
+      <div class="card-body">
+        <div class="bar-list" id="catBars"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">6-Month Trend</span></div>
+      <div class="card-body" style="padding-top:8px">
+        <div class="trend-wrap" id="trendBars"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Recent</span>
+        <span class="text-link" onclick="switchNav('list')">View all</span>
+      </div>
+      <div class="card-body" id="recentEl"></div>
+    </div>
+  </div>
+
+  <!-- ── EXPENSE LIST ── -->
+  <div class="page" id="page-list">
+    <div class="search-wrap">
+      <span class="material-icons-round">search</span>
+      <input type="text" placeholder="Search expenses…" id="searchInput" oninput="renderList()">
+    </div>
+    <div class="filter-row" id="catFilters"></div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" id="listTitle">Expenses</span>
+        <span class="badge" id="listBadge" style="background:var(--primary-light);color:var(--primary)"></span>
+      </div>
+      <div class="card-body" id="listBody"></div>
+    </div>
+  </div>
+
+  <!-- ── ANALYTICS ── -->
+  <div class="page" id="page-analytics">
+    <div class="tabs">
+      <div class="tab-btn active" onclick="switchAnalytics('monthly',this)">Monthly</div>
+      <div class="tab-btn" onclick="switchAnalytics('category',this)">Category</div>
+      <div class="tab-btn" onclick="switchAnalytics('payment',this)">Payment</div>
+    </div>
+    <div id="analyticsBody"></div>
+  </div>
+
+  <!-- ── MORE (Categories + Export + Settings) ── -->
+  <div class="page" id="page-more">
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+      <button class="btn btn-ghost btn-full" style="justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:var(--r)" onclick="showSubPage('sms')">
+        <span class="material-icons-round" style="color:#00897b">sms</span> SMS Import
+        <span id="smsBadge" style="display:none;margin-left:4px;background:var(--red);color:white;border-radius:10px;font-size:11px;font-weight:700;padding:2px 7px"></span>
+        <span class="material-icons-round" style="margin-left:auto;color:var(--ink-3)">chevron_right</span>
+      </button>
+      <button class="btn btn-ghost btn-full" style="justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:var(--r)" onclick="showSubPage('cards')">
+        <span class="material-icons-round" style="color:#e53935">credit_card</span> Credit Cards
+        <span class="material-icons-round" style="margin-left:auto;color:var(--ink-3)">chevron_right</span>
+      </button>
+      <button class="btn btn-ghost btn-full" style="justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:var(--r)" onclick="showSubPage('categories')">
+        <span class="material-icons-round" style="color:var(--primary)">label</span> Manage Categories
+        <span class="material-icons-round" style="margin-left:auto;color:var(--ink-3)">chevron_right</span>
+      </button>
+      <button class="btn btn-ghost btn-full" style="justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:var(--r)" onclick="showSubPage('export')">
+        <span class="material-icons-round" style="color:var(--green)">file_download</span> Export Data
+        <span class="material-icons-round" style="margin-left:auto;color:var(--ink-3)">chevron_right</span>
+      </button>
+      <button class="btn btn-ghost btn-full" style="justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:var(--r)" onclick="showSubPage('settings')">
+        <span class="material-icons-round" style="color:var(--ink-2)">settings</span> Settings
+        <span class="material-icons-round" style="margin-left:auto;color:var(--ink-3)">chevron_right</span>
+      </button>
+    </div>
+
+    <!-- SMS IMPORT SUBPAGE -->
+    <div id="sub-sms" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn-icon-round" onclick="hideSubPage()"><span class="material-icons-round">arrow_back</span></button>
+        <span style="font-size:16px;font-weight:700">SMS Import</span>
+        <span id="queueCountLabel" style="font-size:12px;color:var(--ink-3);margin-left:4px"></span>
+      </div>
+
+      <!-- Paste area -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-head">
+          <span class="card-title">Paste SMS</span>
+          <span style="font-size:11px;color:var(--ink-3)">Supports all major Indian banks</span>
+        </div>
+        <div class="card-body">
+          <textarea id="smsInput" class="form-input" rows="4"
+            placeholder="Paste bank SMS here…&#10;&#10;e.g. INR 850.00 debited from A/c XX1234 on 15-May via UPI to Swiggy. UPI Ref: 123456"
+            style="resize:none;font-size:13px;line-height:1.6;font-family:'DM Sans',sans-serif"></textarea>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-primary btn-full" onclick="parseSmsInput()">
+              <span class="material-icons-round">auto_fix_high</span> Parse & Add to Queue
+            </button>
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:var(--ink-3);line-height:1.6">
+            💡 <strong>Android tip:</strong> In your SMS app, long-press a bank message → Share → Spendwise to skip copy-paste.
+          </div>
+        </div>
+      </div>
+
+      <!-- Review queue -->
+      <div id="smsQueueEl"></div>
+    </div>
+
+    <!-- CREDIT CARDS SUBPAGE -->
+    <div id="sub-cards" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn-icon-round" onclick="hideSubPage()"><span class="material-icons-round">arrow_back</span></button>
+        <span style="font-size:16px;font-weight:700">Credit Cards</span>
+        <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px" onclick="openCardSheet()"><span class="material-icons-round">add</span> Add Card</button>
+      </div>
+      <div style="background:#fff8e1;border-left:4px solid #f9ab00;border-radius:var(--rsm);padding:11px 14px;font-size:13px;color:#5d4037;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start">
+        <span class="material-icons-round" style="font-size:18px;color:#f9ab00;flex-shrink:0;margin-top:1px">info</span>
+        <span>Adding cards is <strong>optional</strong>. If no cards added, all Credit Card expenses show together. Once you add a card, you'll be asked to assign each credit card expense to a specific card.</span>
+      </div>
+      <div id="cardsListEl"></div>
+    </div>
+
+    <!-- CATEGORIES SUBPAGE -->
+    <div id="sub-categories" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn-icon-round" onclick="hideSubPage()"><span class="material-icons-round">arrow_back</span></button>
+        <span style="font-size:16px;font-weight:700">Categories</span>
+        <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px" onclick="openCatSheet()"><span class="material-icons-round">add</span> Add</button>
+      </div>
+      <div id="catListEl"></div>
+    </div>
+
+    <!-- EXPORT SUBPAGE -->
+    <div id="sub-export" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn-icon-round" onclick="hideSubPage()"><span class="material-icons-round">arrow_back</span></button>
+        <span style="font-size:16px;font-weight:700">Export Data</span>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-body">
+          <div class="form-row" style="margin-bottom:12px">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Month</label>
+              <select class="form-input form-select" id="exportMonth"></select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Year</label>
+              <select class="form-input form-select" id="exportYear"></select>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-primary btn-full" onclick="doExport('csv')"><span class="material-icons-round">table_chart</span> Export CSV</button>
+            <button class="btn btn-outlined btn-full" onclick="doExport('text')"><span class="material-icons-round">description</span> Export Text (AI-ready)</button>
+            <button class="btn btn-outlined btn-full" onclick="doExport('json')"><span class="material-icons-round">data_object</span> Export JSON</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Preview</span>
+          <select class="form-input form-select" id="exportPreviewType" style="width:110px;font-size:12px;padding:6px 30px 6px 10px" onchange="updatePreview()">
+            <option value="text">Text</option><option value="csv">CSV</option><option value="json">JSON</option>
+          </select>
+        </div>
+        <div class="card-body" style="padding:12px">
+          <div class="export-pre" id="exportPreview">Select month/year above…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS SUBPAGE -->
+    <div id="sub-settings" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn-icon-round" onclick="hideSubPage()"><span class="material-icons-round">arrow_back</span></button>
+        <span style="font-size:16px;font-weight:700">Settings</span>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Preferences</div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <h4>Currency</h4>
+            <p id="currencyDesc">Indian Rupee (₹)</p>
+          </div>
+          <select class="form-input form-select" id="currencySelect" style="width:130px;font-size:13px;padding:8px 32px 8px 10px" onchange="saveCurrency()">
+            <option value="INR">₹ INR</option>
+            <option value="USD">$ USD</option>
+            <option value="EUR">€ EUR</option>
+            <option value="GBP">£ GBP</option>
+            <option value="JPY">¥ JPY</option>
+            <option value="AUD">A$ AUD</option>
+            <option value="CAD">C$ CAD</option>
+            <option value="SGD">S$ SGD</option>
+            <option value="AED">د.إ AED</option>
+          </select>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <h4>Daily Reminder</h4>
+            <p>Browser notification to log expenses</p>
+          </div>
+          <div class="toggle" id="notifToggle" onclick="toggleNotif()"></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Data</div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <h4>Clear All Data</h4>
+            <p>Delete all expenses permanently</p>
+          </div>
+          <button class="btn btn-danger" style="padding:8px 14px;font-size:13px" onclick="clearData()">Clear</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">About</div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <h4>Spendwise v1.0</h4>
+            <p>All data stored locally on this device</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /scroll-area -->
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <div class="nav-tab active" id="nav-home" onclick="switchNav('home')">
+    <span class="material-icons-round">home</span>
+    <span>Home</span>
+    <div class="nav-pip"></div>
+  </div>
+  <div class="nav-tab" id="nav-list" onclick="switchNav('list')">
+    <span class="material-icons-round">receipt_long</span>
+    <span>Expenses</span>
+    <div class="nav-pip"></div>
+  </div>
+  <div class="nav-tab" id="nav-analytics" onclick="switchNav('analytics')">
+    <span class="material-icons-round">bar_chart</span>
+    <span>Analytics</span>
+    <div class="nav-pip"></div>
+  </div>
+  <div class="nav-tab" id="nav-more" onclick="switchNav('more')">
+    <span class="material-icons-round">menu</span>
+    <span>More</span>
+    <div class="nav-pip"></div>
+  </div>
+</nav>
+
+<!-- ADD/EDIT SHEET -->
+<div class="overlay" id="expSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="sheetTitle">Add Expense</span>
+      <button class="sheet-close" onclick="closeSheet('expSheet')"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-group">
+        <label class="form-label">Description *</label>
+        <input type="text" class="form-input" id="fDesc" placeholder="What did you spend on?" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Amount *</label>
+          <div class="input-wrap">
+            <span class="input-prefix-sym" id="amtSym">₹</span>
+            <input type="number" class="form-input" id="fAmt" placeholder="0" min="0" step="0.01" inputmode="decimal">
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Date *</label>
+          <input type="date" class="form-input" id="fDate">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <div class="chips-wrap" id="catChips"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Type</label>
+        <select class="form-input form-select" id="fPayment" onchange="onPaymentChange()">
+          <option>UPI</option><option>Cash</option><option>Credit Card</option>
+          <option>Debit Card</option><option>Net Banking</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group" id="cardPickerGroup" style="display:none">
+        <label class="form-label">Credit Card *</label>
+        <div class="chips-wrap" id="cardChips"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="form-input" id="fNotes" placeholder="Optional note…" autocomplete="off">
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="closeSheet('expSheet')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveExp()" id="saveExpBtn">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATEGORY SHEET -->
+<div class="overlay" id="catSheet">
+  <div class="sheet" style="max-width:420px">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">New Category</span>
+      <button class="sheet-close" onclick="closeSheet('catSheet')"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-group">
+        <label class="form-label">Emoji</label>
+        <input type="text" class="form-input" id="cEmoji" placeholder="🛒" maxlength="4" style="font-size:24px;text-align:center">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input type="text" class="form-input" id="cName" placeholder="Category name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Color</label>
+        <input type="color" class="form-input" id="cColor" value="#1a73e8" style="height:48px;padding:6px;cursor:pointer">
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="closeSheet('catSheet')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCat()">Add Category</button>
+    </div>
+  </div>
+</div>
+
+<!-- SMS CONFIRM SHEET -->
+<div class="overlay" id="smsConfirmSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Review & Save</span>
+      <button class="sheet-close" onclick="closeSheet('smsConfirmSheet')"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="sheet-body">
+      <!-- original SMS for reference -->
+      <div id="smsOriginalText" style="background:var(--surface-3);border-radius:var(--rsm);padding:10px 12px;font-size:12px;color:var(--ink-2);line-height:1.6;margin-bottom:16px;border-left:3px solid var(--border)"></div>
+      <div class="form-group">
+        <label class="form-label">
+          Description
+          <span id="smsDescConf" style="margin-left:6px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px"></span>
+        </label>
+        <input type="text" class="form-input" id="smsFDesc" placeholder="Merchant / description">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">
+            Amount
+            <span id="smsAmtConf" style="margin-left:6px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px"></span>
+          </label>
+          <div class="input-wrap">
+            <span class="input-prefix-sym" id="smsAmtSym">₹</span>
+            <input type="number" class="form-input" id="smsFAmt" placeholder="0" min="0" step="0.01" inputmode="decimal">
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">
+            Date
+            <span id="smsDateConf" style="margin-left:6px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px"></span>
+          </label>
+          <input type="date" class="form-input" id="smsFDate">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <div class="chips-wrap" id="smsCatChips"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">
+          Payment Type
+          <span id="smsPayConf" style="margin-left:6px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px"></span>
+        </label>
+        <select class="form-input form-select" id="smsFPayment" onchange="onSmsPaymentChange()">
+          <option>UPI</option><option>Cash</option><option>Credit Card</option>
+          <option>Debit Card</option><option>Net Banking</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group" id="smsCardPickerGroup" style="display:none">
+        <label class="form-label">Credit Card *</label>
+        <div class="chips-wrap" id="smsCardChips"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="form-input" id="smsFNotes" placeholder="Optional note…" autocomplete="off">
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="dismissSmsItem()">Discard</button>
+      <button class="btn btn-primary" onclick="confirmSmsItem()">Save Expense</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREDIT CARD SHEET -->
+<div class="overlay" id="cardSheet">
+  <div class="sheet" style="max-width:420px">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="cardSheetTitle">Add Credit Card</span>
+      <button class="sheet-close" onclick="closeSheet('cardSheet')"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-group">
+        <label class="form-label">Card Name *</label>
+        <input type="text" class="form-input" id="ccName" placeholder="e.g. HDFC Regalia, Axis Flipkart" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Last 4 Digits (optional)</label>
+        <input type="text" class="form-input" id="ccLast4" placeholder="e.g. 4321" maxlength="4" inputmode="numeric">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Credit Limit (optional)</label>
+        <div class="input-wrap">
+          <span class="input-prefix-sym" id="ccLimitSym">₹</span>
+          <input type="number" class="form-input" id="ccLimit" placeholder="Leave blank if not needed" min="0" inputmode="decimal">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Card Color</label>
+        <div style="display:flex;flex-wrap:wrap;gap:10px" id="ccColorPicker"></div>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="closeSheet('cardSheet')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCard()" id="saveCardBtn">Add Card</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastWrap"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────
+const S = {
+  expenses: [],
+  categories: [],
+  cards: [],
+  smsQueue: [],        // persisted review queue: {id, raw, parsed:{...}, status:'pending'}
+  settings: { currency: 'INR', notif: false },
+  month: new Date().getMonth(),
+  year:  new Date().getFullYear(),
+  editId: null,
+  filterCat: '',
+  activeSmsId: null    // which queue item is open in confirm sheet
+};
+
+const CUR = { INR:'₹', USD:'$', EUR:'€', GBP:'£', JPY:'¥', AUD:'A$', CAD:'C$', SGD:'S$', AED:'د.إ' };
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const FMONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DEFAULT_CATS = [
+  {id:'food',name:'Food & Dining',emoji:'🍽️',color:'#e53935'},
+  {id:'transport',name:'Transport',emoji:'🚗',color:'#1e88e5'},
+  {id:'shopping',name:'Shopping',emoji:'🛍️',color:'#8e24aa'},
+  {id:'bills',name:'Bills & Utilities',emoji:'💡',color:'#fb8c00'},
+  {id:'health',name:'Health',emoji:'🏥',color:'#43a047'},
+  {id:'entertainment',name:'Entertainment',emoji:'🎬',color:'#e91e63'},
+  {id:'education',name:'Education',emoji:'📚',color:'#00897b'},
+  {id:'personal',name:'Personal Care',emoji:'🧴',color:'#f4511e'},
+  {id:'savings',name:'Savings',emoji:'💰',color:'#f9ab00'},
+  {id:'other',name:'Other',emoji:'📦',color:'#607d8b'},
+];
+const PAYMENT_TYPES = ['UPI','Cash','Credit Card','Debit Card','Net Banking','Other'];
+
+// ── PERSIST ────────────────────────────────────
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem('sw2') || 'null');
+    if (d) {
+      S.expenses   = d.expenses   || [];
+      S.categories = d.categories || DEFAULT_CATS;
+      S.cards      = d.cards      || [];
+      S.smsQueue   = d.smsQueue   || [];
+      S.settings   = { ...S.settings, ...d.settings };
+    } else { S.categories = [...DEFAULT_CATS]; }
+  } catch { S.categories = [...DEFAULT_CATS]; }
+}
+function persist() {
+  localStorage.setItem('sw2', JSON.stringify({
+    expenses: S.expenses, categories: S.categories,
+    cards: S.cards, smsQueue: S.smsQueue, settings: S.settings
+  }));
+}
+
+// ── HELPERS ────────────────────────────────────
+function fmt(n) { return (CUR[S.settings.currency]||'₹') + Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function cat(id) { return S.categories.find(c=>c.id===id) || {name:'Other',emoji:'📦',color:'#607d8b'}; }
+function moExp(m,y) { return S.expenses.filter(e=>{ const d=new Date(e.date); return d.getMonth()===m&&d.getFullYear()===y; }); }
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function rgb(hex) { return [parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)].join(','); }
+function dateLabel(dt) { return new Date(dt+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',weekday:'short'}); }
+
+// ── MONTH NAV ──────────────────────────────────
+function updateMonthLabel() { document.getElementById('monthLabel').textContent = FMONTHS[S.month]+' '+S.year; }
+function changeMonth(d) {
+  S.month += d;
+  if (S.month>11){S.month=0;S.year++;}
+  if (S.month<0){S.month=11;S.year--;}
+  updateMonthLabel();
+  S.filterCat = '';
+  refreshActive();
+}
+
+// ── NAVIGATION ─────────────────────────────────
+let currentNav = 'home';
+function switchNav(tab) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  document.getElementById('nav-'+tab)?.classList.add('active');
+  currentNav = tab;
+  hideSubPage();
+  if (tab==='home') renderHome();
+  if (tab==='list') renderList();
+  if (tab==='analytics') renderAnalytics('monthly');
+}
+function refreshActive() {
+  if (currentNav==='home') renderHome();
+  else if (currentNav==='list') renderList();
+  else if (currentNav==='analytics') renderAnalytics('monthly');
+}
+function showSubPage(id) {
+  document.querySelectorAll('[id^="sub-"]').forEach(el=>el.style.display='none');
+  document.querySelector('#page-more > div:first-child').style.display='none';
+  document.getElementById('sub-'+id).style.display='block';
+  if (id==='categories') renderCatList();
+  if (id==='export') initExport();
+  if (id==='settings') renderSettings();
+  if (id==='cards') renderCardsList();
+  if (id==='sms') renderSmsPage();
+}
+function hideSubPage() {
+  document.querySelectorAll('[id^="sub-"]').forEach(el=>el.style.display='none');
+  const menu = document.querySelector('#page-more > div:first-child');
+  if (menu) menu.style.display='flex';
+}
+
+// ── REMINDER ───────────────────────────────────
+function checkReminder() {
+  const today = new Date().toISOString().slice(0,10);
+  const todayCount = S.expenses.filter(e=>e.date===today).length;
+  const el = document.getElementById('reminderEl');
+  if (!el) return;
+  if (todayCount > 0) { el.style.display='none'; return; }
+  const sorted = [...S.expenses].sort((a,b)=>b.date.localeCompare(a.date));
+  const last = sorted[0];
+  if (last) {
+    const diff = Math.floor((new Date(today)-new Date(last.date))/86400000);
+    if (diff > 0) {
+      document.getElementById('reminderMsg').textContent = diff===1 ? 'today or yesterday' : `in the last ${diff} days`;
+      el.style.display='flex';
+    } else { el.style.display='none'; }
+  } else {
+    document.getElementById('reminderMsg').textContent = 'yet';
+    el.style.display='flex';
+  }
+}
+
+// ── HOME ───────────────────────────────────────
+function renderHome() {
+  checkReminder();
+  const exps = moExp(S.month, S.year);
+  const total = exps.reduce((s,e)=>s+e.amount,0);
+  const sym = CUR[S.settings.currency]||'₹';
+  let pm=S.month-1, py=S.year; if(pm<0){pm=11;py--;}
+  const prevTotal = moExp(pm,py).reduce((s,e)=>s+e.amount,0);
+  const diff = prevTotal ? ((total-prevTotal)/prevTotal*100).toFixed(1) : null;
+  const days = new Set(exps.map(e=>e.date)).size;
+  const avg = days ? (total/days) : 0;
+
+  // top cat
+  const catMap = {};
+  exps.forEach(e=>{ catMap[e.category]=(catMap[e.category]||0)+e.amount; });
+  const topId = Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a])[0];
+  const topC = topId ? cat(topId) : null;
+
+  document.getElementById('statStrip').innerHTML = `
+    <div class="stat-card" style="--accent:var(--primary)">
+      <div class="stat-label">Total Spent</div>
+      <div class="stat-val">${sym}${Math.round(total).toLocaleString('en-IN')}</div>
+      <div class="stat-sub">${diff!==null?(diff>0?'▲':'▼')+Math.abs(diff)+'% vs last month':'This month'}</div>
+    </div>
+    <div class="stat-card" style="--accent:var(--green)">
+      <div class="stat-label">Transactions</div>
+      <div class="stat-val">${exps.length}</div>
+      <div class="stat-sub">${days} active day${days!==1?'s':''}</div>
+    </div>
+    <div class="stat-card" style="--accent:var(--yellow)">
+      <div class="stat-label">Avg / Day</div>
+      <div class="stat-val">${sym}${Math.round(avg).toLocaleString('en-IN')}</div>
+      <div class="stat-sub">Active days</div>
+    </div>
+    <div class="stat-card" style="--accent:var(--red)">
+      <div class="stat-label">Top Category</div>
+      <div class="stat-val" style="font-size:16px;margin-top:4px">${topC ? topC.emoji+' '+topC.name.split(' ')[0] : '—'}</div>
+      <div class="stat-sub">${topC ? fmt(catMap[topId]) : 'No data'}</div>
+    </div>
+  `;
+
+  // cat bars
+  const sorted = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const max = sorted[0]?.[1]||1;
+  if (sorted[0]) document.getElementById('topCatLabel').textContent = cat(sorted[0][0]).emoji+' '+cat(sorted[0][0]).name;
+  document.getElementById('catBars').innerHTML = sorted.length
+    ? sorted.map(([id,amt])=>{
+        const c=cat(id); const pct=(amt/max*100).toFixed(1);
+        return `<div class="bar-row">
+          <div class="bar-lbl">${c.emoji} ${c.name}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${c.color}">
+            ${pct>30?`<span>${(amt/total*100).toFixed(0)}%</span>`:''}
+          </div></div>
+          <div class="bar-amt">${fmt(amt)}</div>
+        </div>`;
+      }).join('')
+    : '<div class="empty"><span class="material-icons-round">bar_chart</span><p>No data this month</p></div>';
+
+  // trend
+  const trendData = [];
+  for (let i=5;i>=0;i--) {
+    let m=S.month-i, y=S.year; if(m<0){m+=12;y--;}
+    trendData.push({ label:MONTHS[m], total:moExp(m,y).reduce((s,e)=>s+e.amount,0), cur:m===S.month&&y===S.year });
+  }
+  const tMax = Math.max(...trendData.map(t=>t.total),1);
+  document.getElementById('trendBars').innerHTML = trendData.map(t=>{
+    const h=Math.max((t.total/tMax)*80,t.total>0?5:2);
+    return `<div class="trend-col">
+      <div class="trend-amt">${t.total>0?sym+Math.round(t.total/1000)+'K':''}</div>
+      <div class="trend-bar" style="height:${h}px;background:${t.cur?'var(--primary)':'#c5cae9'}"></div>
+      <div class="trend-mo" style="font-weight:${t.cur?700:400};color:${t.cur?'var(--primary)':'var(--ink-3)'}">${t.label}</div>
+    </div>`;
+  }).join('');
+
+  // recent
+  const recent = [...exps].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  document.getElementById('recentEl').innerHTML = recent.length
+    ? recent.map(e=>expItem(e,false)).join('')
+    : '<div class="empty"><span class="material-icons-round">receipt_long</span><p>No expenses this month</p></div>';
+}
+
+// ── LIST ───────────────────────────────────────
+function renderList() {
+  const exps = moExp(S.month, S.year);
+  const search = document.getElementById('searchInput')?.value.toLowerCase()||'';
+
+  // filter chips
+  const catCounts = {};
+  exps.forEach(e=>{ catCounts[e.category]=(catCounts[e.category]||0)+1; });
+  const usedCats = S.categories.filter(c=>catCounts[c.id]);
+  document.getElementById('catFilters').innerHTML =
+    `<div class="filter-chip ${!S.filterCat?'sel':''}" onclick="setCatFilter('')">All</div>` +
+    usedCats.map(c=>`<div class="filter-chip ${S.filterCat===c.id?'sel':''}" onclick="setCatFilter('${c.id}')">${c.emoji} ${c.name}</div>`).join('');
+
+  let filtered = exps.filter(e=>{
+    const c=cat(e.category);
+    const ms = !search || e.description.toLowerCase().includes(search)||(e.notes||'').toLowerCase().includes(search)||c.name.toLowerCase().includes(search);
+    const mc = !S.filterCat || e.category===S.filterCat;
+    return ms && mc;
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+
+  const total = filtered.reduce((s,e)=>s+e.amount,0);
+  document.getElementById('listTitle').textContent = `${MONTHS[S.month]} ${S.year} · ${fmt(total)}`;
+  document.getElementById('listBadge').textContent = filtered.length+' item'+(filtered.length!==1?'s':'');
+
+  if (!filtered.length) {
+    document.getElementById('listBody').innerHTML = '<div class="empty"><span class="material-icons-round">search_off</span><p>No results</p></div>';
+    return;
+  }
+
+  // group by date
+  const groups = {};
+  filtered.forEach(e=>{ (groups[e.date]=groups[e.date]||[]).push(e); });
+  let html='';
+  Object.keys(groups).sort((a,b)=>b.localeCompare(a)).forEach(d=>{
+    const dayTotal = groups[d].reduce((s,e)=>s+e.amount,0);
+    html+=`<div class="date-header">${dateLabel(d)} <span style="float:right;font-weight:400">${fmt(dayTotal)}</span></div>`;
+    html+=groups[d].map(e=>expItem(e,true)).join('');
+  });
+  document.getElementById('listBody').innerHTML = html;
+}
+
+function setCatFilter(id) { S.filterCat=id; renderList(); }
+
+function expItem(e, actions=false) {
+  const c=cat(e.category);
+  const cardInfo = (e.paymentType==='Credit Card' && e.cardId) ? getCard(e.cardId) : null;
+  const payLabel = cardInfo ? `${e.paymentType} · ${cardInfo.name}${cardInfo.last4?' ••'+cardInfo.last4:''}` : e.paymentType;
+  return `<div class="exp-item" id="ei-${e.id}">
+    <div class="exp-icon" style="background:rgba(${rgb(c.color)},.13)">${c.emoji}</div>
+    <div class="exp-info">
+      <div class="exp-name">${e.description}</div>
+      <div class="exp-meta">${c.name} · ${payLabel}${e.notes?' · '+e.notes:''}</div>
+    </div>
+    <div class="exp-right">
+      <div class="exp-amt">${fmt(e.amount)}</div>
+      ${actions?`<div class="exp-actions">
+        <button onclick="editExp('${e.id}')" title="Edit"><span class="material-icons-round">edit</span></button>
+        <button class="del" onclick="delExp('${e.id}')" title="Delete"><span class="material-icons-round">delete</span></button>
+      </div>`:''}
+    </div>
+  </div>`;
+}
+
+// ── ANALYTICS ──────────────────────────────────
+function switchAnalytics(tab, el) {
+  document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderAnalytics(tab);
+}
+
+function pctBadge(pct, color='var(--primary)') {
+  return `<span style="display:inline-block;min-width:42px;text-align:right;font-size:12px;font-weight:700;font-family:'DM Mono',monospace;color:${color}">${pct}%</span>`;
+}
+
+function renderAnalytics(tab) {
+  const el = document.getElementById('analyticsBody');
+
+  if (tab==='monthly') {
+    const rows = [];
+    for (let i=5;i>=0;i--) {
+      let m=S.month-i, y=S.year; if(m<0){m+=12;y--;}
+      const exps=moExp(m,y);
+      const tot=exps.reduce((s,e)=>s+e.amount,0);
+      rows.push({label:MONTHS[m]+' '+y, total:tot, count:exps.length, m, y});
+    }
+    const grandTotal = rows.reduce((s,r)=>s+r.total,0);
+    const mx = Math.max(...rows.map(r=>r.total),1);
+    const avg6 = grandTotal / 6;
+    const curRow = rows[rows.length-1];
+    const vsAvg = avg6 ? ((curRow.total-avg6)/avg6*100).toFixed(1) : null;
+
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="stat-card" style="--accent:var(--primary)">
+          <div class="stat-label">6-Month Total</div>
+          <div class="stat-val" style="font-size:18px">${fmt(grandTotal)}</div>
+          <div class="stat-sub">${rows.filter(r=>r.total>0).length} active months</div>
+        </div>
+        <div class="stat-card" style="--accent:var(--yellow)">
+          <div class="stat-label">Monthly Avg</div>
+          <div class="stat-val" style="font-size:18px">${fmt(avg6)}</div>
+          <div class="stat-sub">${vsAvg!==null?(vsAvg>0?'▲ '+vsAvg+'% this month':'▼ '+Math.abs(vsAvg)+'% this month'):'No comparison'}</div>
+        </div>
+      </div>
+      <div class="card"><div class="card-head">
+        <span class="card-title">6-Month Spending</span>
+        <span style="font-size:11px;color:var(--ink-3)">% of period total</span>
+      </div><div class="card-body"><div class="bar-list">${
+        rows.map(r=>{
+          const barPct = (r.total/mx*100).toFixed(1);
+          const utilPct = grandTotal ? (r.total/grandTotal*100).toFixed(1) : '0.0';
+          const isCur = r.m===S.month && r.y===S.year;
+          return `<div class="bar-row">
+            <div class="bar-lbl" style="font-weight:${isCur?700:400};color:${isCur?'var(--primary)':'var(--ink-2)'}">${r.label}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${isCur?'var(--primary)':'#c5cae9'}">
+              ${barPct>20?`<span>${utilPct}%</span>`:''}
+            </div></div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
+              <div class="bar-amt" style="margin:0">${fmt(r.total)}</div>
+              <div style="font-size:11px;font-weight:700;color:${isCur?'var(--primary)':'var(--ink-3)'};font-family:'DM Mono',monospace">${utilPct}%</div>
+            </div>
+          </div>`;
+        }).join('')
+      }</div></div></div>`;
+
+  } else if (tab==='category') {
+    const exps=moExp(S.month,S.year);
+    const cm={};exps.forEach(e=>{cm[e.category]=(cm[e.category]||0)+e.amount;});
+    const sorted=Object.entries(cm).sort((a,b)=>b[1]-a[1]);
+    const total=sorted.reduce((s,[,v])=>s+v,0);
+    const mx=sorted[0]?.[1]||1;
+    const topEntry = sorted[0];
+    const topC = topEntry ? cat(topEntry[0]) : null;
+
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="stat-card" style="--accent:var(--primary)">
+          <div class="stat-label">Categories Used</div>
+          <div class="stat-val">${sorted.length}</div>
+          <div class="stat-sub">of ${S.categories.length} total</div>
+        </div>
+        <div class="stat-card" style="--accent:var(--red)">
+          <div class="stat-label">Biggest Spend</div>
+          <div class="stat-val" style="font-size:15px;margin-top:4px">${topC?topC.emoji+' '+topC.name.split(' ')[0]:'—'}</div>
+          <div class="stat-sub">${topEntry?(total?(topEntry[1]/total*100).toFixed(1)+'% of total':''):'No data'}</div>
+        </div>
+      </div>
+      <div class="card"><div class="card-head">
+        <span class="card-title">Categories · ${MONTHS[S.month]}</span>
+        <span style="font-size:11px;color:var(--ink-3)">% of month total</span>
+      </div><div class="card-body">${
+        sorted.length?`<div class="bar-list">${sorted.map(([id,amt])=>{
+          const c=cat(id);
+          const utilPct=(amt/total*100).toFixed(1);
+          const barPct=(amt/mx*100).toFixed(1);
+          return`<div class="bar-row">
+            <div class="bar-lbl">${c.emoji} ${c.name}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${c.color}">
+              ${barPct>20?`<span>${utilPct}%</span>`:''}
+            </div></div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
+              <div class="bar-amt" style="margin:0">${fmt(amt)}</div>
+              <div style="font-size:11px;font-weight:700;color:${c.color};font-family:'DM Mono',monospace">${utilPct}%</div>
+            </div>
+          </div>`;
+        }).join('')}</div>`:`<div class="empty"><span class="material-icons-round">bar_chart</span><p>No data</p></div>`
+      }</div></div>`;
+
+  } else if (tab==='payment') {
+    const exps=moExp(S.month,S.year);
+    const pm={};exps.forEach(e=>{pm[e.paymentType]=(pm[e.paymentType]||0)+e.amount;});
+    const sorted=Object.entries(pm).sort((a,b)=>b[1]-a[1]);
+    const total=sorted.reduce((s,[,v])=>s+v,0);
+    const mx=sorted[0]?.[1]||1;
+    const cols=['#1a73e8','#34a853','#f9ab00','#ea4335','#9c27b0','#607d8b'];
+    const topPay=sorted[0];
+    const sym=CUR[S.settings.currency]||'₹';
+
+    // credit card per-card breakdown (only if cards configured)
+    const ccExps = exps.filter(e=>e.paymentType==='Credit Card');
+    const hasCards = S.cards.length > 0;
+    let ccSection = '';
+    if(hasCards && ccExps.length>0) {
+      const cardTotals = S.cards.map(c=>{
+        const spent=ccExps.filter(e=>e.cardId===c.id).reduce((s,e)=>s+e.amount,0);
+        return {c,spent};
+      }).filter(x=>x.spent>0).sort((a,b)=>b.spent-a.spent);
+      const unassigned=ccExps.filter(e=>!e.cardId).reduce((s,e)=>s+e.amount,0);
+      const ccTotal=ccExps.reduce((s,e)=>s+e.amount,0);
+      const cardMx=Math.max(...cardTotals.map(x=>x.spent),unassigned,1);
+
+      ccSection=`<div class="card" style="margin-top:14px">
+        <div class="card-head">
+          <span class="card-title">💳 Credit Card Breakdown</span>
+          <span style="font-size:11px;color:var(--ink-3)">${fmt(ccTotal)} total</span>
+        </div>
+        <div class="card-body">
+          <div class="bar-list">${cardTotals.map(({c,spent})=>{
+            const utilPct=(spent/ccTotal*100).toFixed(1);
+            const barPct=(spent/cardMx*100).toFixed(1);
+            const limitPct=c.limit?Math.min((spent/c.limit*100),100).toFixed(1):null;
+            const limitColor=limitPct?(limitPct>=90?'var(--red)':limitPct>=70?'var(--yellow)':'var(--green)'):'';
+            return`<div style="margin-bottom:12px">
+              <div class="bar-row" style="margin-bottom:4px">
+                <div class="bar-lbl" style="display:flex;align-items:center;gap:6px">
+                  <span style="width:10px;height:10px;border-radius:50%;background:${c.color};flex-shrink:0"></span>
+                  <span style="overflow:hidden;text-overflow:ellipsis">${c.name}${c.last4?' ••'+c.last4:''}</span>
+                </div>
+                <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${c.color}">
+                  ${barPct>20?`<span>${utilPct}%</span>`:''}
+                </div></div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
+                  <div class="bar-amt" style="margin:0">${fmt(spent)}</div>
+                  <div style="font-size:11px;font-weight:700;color:${c.color};font-family:'DM Mono',monospace">${utilPct}%</div>
+                </div>
+              </div>
+              ${c.limit?`<div style="margin-left:112px;margin-right:0">
+                <div style="height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden">
+                  <div style="height:100%;width:${limitPct}%;background:${limitColor};border-radius:2px;transition:width .5s"></div>
+                </div>
+                <div style="font-size:10px;color:${limitColor};font-weight:600;margin-top:2px">${limitPct}% of ${sym}${Number(c.limit).toLocaleString('en-IN')} limit</div>
+              </div>`:''}
+            </div>`;
+          }).join('')}
+          ${unassigned>0?`<div class="bar-row">
+            <div class="bar-lbl" style="color:var(--ink-3)">Unassigned</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(unassigned/cardMx*100).toFixed(1)}%;background:#b0bec5"></div></div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
+              <div class="bar-amt" style="margin:0;color:var(--ink-3)">${fmt(unassigned)}</div>
+              <div style="font-size:11px;color:var(--ink-3);font-family:'DM Mono',monospace">${(unassigned/ccTotal*100).toFixed(1)}%</div>
+            </div>
+          </div>`:''}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="stat-card" style="--accent:var(--primary)">
+          <div class="stat-label">Methods Used</div>
+          <div class="stat-val">${sorted.length}</div>
+          <div class="stat-sub">This month</div>
+        </div>
+        <div class="stat-card" style="--accent:var(--green)">
+          <div class="stat-label">Most Used</div>
+          <div class="stat-val" style="font-size:15px;margin-top:4px">${topPay?topPay[0]:'—'}</div>
+          <div class="stat-sub">${topPay?(total?(topPay[1]/total*100).toFixed(1)+'% of spend':''):'No data'}</div>
+        </div>
+      </div>
+      <div class="card"><div class="card-head">
+        <span class="card-title">Payment Methods · ${MONTHS[S.month]}</span>
+        <span style="font-size:11px;color:var(--ink-3)">% of month total</span>
+      </div><div class="card-body">${
+        sorted.length?`<div class="bar-list">${sorted.map(([pay,amt],i)=>{
+          const utilPct=(amt/total*100).toFixed(1);
+          const barPct=(amt/mx*100).toFixed(1);
+          return`<div class="bar-row">
+            <div class="bar-lbl">💳 ${pay}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${cols[i%cols.length]}">
+              ${barPct>20?`<span>${utilPct}%</span>`:''}
+            </div></div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
+              <div class="bar-amt" style="margin:0">${fmt(amt)}</div>
+              <div style="font-size:11px;font-weight:700;color:${cols[i%cols.length]};font-family:'DM Mono',monospace">${utilPct}%</div>
+            </div>
+          </div>`;
+        }).join('')}</div>`:`<div class="empty"><span class="material-icons-round">credit_card_off</span><p>No data</p></div>`
+      }</div></div>${ccSection}`;
+  }
+}
+
+// ── SMS IMPORT ─────────────────────────────────
+
+// ── Parser ─────────────────────────────────────
+// Returns {amount, merchant, date, paymentType, last4, isCredit, confidence:{amount,merchant,date,payment}}
+// confidence: 'high' | 'low'
+function parseSms(raw) {
+  const txt = raw.replace(/\s+/g,' ').trim();
+  const r = {
+    raw: txt,
+    amount: null, merchant: null, date: null,
+    paymentType: null, last4: null, isCredit: false,
+    confidence: { amount:'low', merchant:'low', date:'low', payment:'low' }
+  };
+
+  // ── Credit detection — skip salary, refund, credit, cashback ──
+  const creditPat = /\b(credited|credit|salary|refund|cashback|reversal|reward|bonus|received|deposited)\b/i;
+  if (creditPat.test(txt)) { r.isCredit = true; return r; }
+
+  // ── Amount ──
+  const amtPatterns = [
+    /(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)/i,
+    /([\d,]+(?:\.\d{1,2})?)\s*(?:INR|Rs\.?|₹)/i,
+    /(?:debited|deducted|paid|spent|transaction of|txn of)\s+(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+    /(?:amount|amt)\s*[:\-]?\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+  ];
+  for (const p of amtPatterns) {
+    const m = txt.match(p);
+    if (m) {
+      r.amount = parseFloat(m[1].replace(/,/g,''));
+      r.confidence.amount = 'high';
+      break;
+    }
+  }
+
+  // ── Date ──
+  const today = new Date().toISOString().slice(0,10);
+  const datePatterns = [
+    // DD-Mon-YY or DD-Mon-YYYY
+    { p: /(\d{1,2})[-\/\s](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-\/\s,]?(\d{2,4})?/i,
+      fn: m => {
+        const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+        const mo = months[m[2].slice(0,3).toLowerCase()];
+        const yr = m[3] ? (m[3].length===2 ? 2000+parseInt(m[3]) : parseInt(m[3])) : new Date().getFullYear();
+        return new Date(yr, mo, parseInt(m[1]));
+      }
+    },
+    // DD/MM/YYYY or DD-MM-YYYY
+    { p: /(\d{2})[-\/](\d{2})[-\/](\d{2,4})/,
+      fn: m => {
+        const yr = m[3].length===2 ? 2000+parseInt(m[3]) : parseInt(m[3]);
+        return new Date(yr, parseInt(m[2])-1, parseInt(m[1]));
+      }
+    },
+    // YYYY-MM-DD
+    { p: /(\d{4})-(\d{2})-(\d{2})/,
+      fn: m => new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]))
+    },
+  ];
+  for (const {p,fn} of datePatterns) {
+    const m = txt.match(p);
+    if (m) {
+      try {
+        const d = fn(m);
+        if (!isNaN(d.getTime())) {
+          r.date = d.toISOString().slice(0,10);
+          r.confidence.date = 'high';
+          break;
+        }
+      } catch {}
+    }
+  }
+  if (!r.date) { r.date = today; r.confidence.date = 'low'; }
+
+  // ── Payment type ──
+  if (/\bUPI\b/i.test(txt))                          { r.paymentType='UPI';          r.confidence.payment='high'; }
+  else if (/\b(credit card|cc)\b/i.test(txt))        { r.paymentType='Credit Card';  r.confidence.payment='high'; }
+  else if (/\b(debit card|dc)\b/i.test(txt))         { r.paymentType='Debit Card';   r.confidence.payment='high'; }
+  else if (/\b(net.?banking|neft|imps|rtgs)\b/i.test(txt)) { r.paymentType='Net Banking'; r.confidence.payment='high'; }
+  else if (/\b(atm|cash)\b/i.test(txt))              { r.paymentType='Cash';         r.confidence.payment='high'; }
+  else                                                { r.paymentType='UPI';          r.confidence.payment='low'; }
+
+  // ── Last 4 digits of card/account ──
+  const last4m = txt.match(/[Xx*]{2,}(\d{4})/);
+  if (last4m) r.last4 = last4m[1];
+
+  // ── Merchant / payee ──
+  // Try various patterns in order of confidence
+  const merchantPatterns = [
+    // "to <merchant>" patterns
+    /\bto\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,30}?)(?:\s*(?:on|via|UPI|Ref|for|\.)|$)/i,
+    // "at <merchant>"
+    /\bat\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,30}?)(?:\s*(?:on|via|Ref|for|\.)|$)/i,
+    // VPA patterns like merchant@upi
+    /\b([A-Za-z][A-Za-z0-9]{2,})\s*@[a-z]+/i,
+    // "Info: UPI/<merchant>"
+    /Info:\s*(?:UPI\/)?([A-Za-z][A-Za-z0-9\s&]{2,25})/i,
+    // "paid to <merchant>"
+    /paid\s+to\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,30})/i,
+    // Merchant name in caps at end
+    /(?:at|towards)\s+([A-Z][A-Z\s&]{3,25})\b/,
+  ];
+  for (const p of merchantPatterns) {
+    const m = txt.match(p);
+    if (m) {
+      const candidate = m[1].trim().replace(/\s+/g,' ');
+      // Filter out noise words
+      const noise = /^(your|the|a|an|account|bank|card|UPI|IMPS|NEFT|net|banking|ref|no|on|via|for)$/i;
+      if (!noise.test(candidate) && candidate.length > 1) {
+        r.merchant = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+        r.confidence.merchant = 'high';
+        break;
+      }
+    }
+  }
+
+  // Auto-match credit card by last4
+  if (r.paymentType === 'Credit Card' && r.last4) {
+    const matched = S.cards.find(c => c.last4 === r.last4);
+    if (matched) r.cardId = matched.id;
+  }
+
+  return r;
+}
+
+// ── Confidence badge HTML ──
+function confBadge(level) {
+  if (level==='high') return `<span style="background:#e8f5e9;color:#2e7d32;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px">✓ parsed</span>`;
+  return `<span style="background:#fff3e0;color:#e65100;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px">⚠ check</span>`;
+}
+
+// ── Queue badge update ──
+function updateSmsBadge() {
+  const pending = S.smsQueue.filter(q=>q.status==='pending').length;
+  const badge = document.getElementById('smsBadge');
+  if (!badge) return;
+  if (pending > 0) { badge.textContent = pending; badge.style.display='inline'; }
+  else badge.style.display='none';
+}
+
+// ── Render SMS page ──
+function renderSmsPage() {
+  const pending = S.smsQueue.filter(q=>q.status==='pending');
+  const done    = S.smsQueue.filter(q=>q.status!=='pending');
+
+  document.getElementById('queueCountLabel').textContent =
+    pending.length ? `${pending.length} pending` : '';
+  updateSmsBadge();
+
+  const el = document.getElementById('smsQueueEl');
+  if (!S.smsQueue.length) {
+    el.innerHTML = `<div class="empty"><span class="material-icons-round">sms</span><p>No messages in queue.<br>Paste an SMS above to get started.</p></div>`;
+    return;
+  }
+
+  let html = '';
+
+  if (pending.length) {
+    html += `<div style="font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Pending Review (${pending.length})</div>`;
+    html += pending.map(q => smsQueueCard(q)).join('');
+  }
+
+  if (done.length) {
+    html += `<div style="font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px">Done (${done.length})</div>`;
+    html += done.map(q => smsQueueCard(q)).join('');
+    html += `<button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="clearDoneSms()">
+      <span class="material-icons-round">delete_sweep</span> Clear done items
+    </button>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ── Single queue card ──
+function smsQueueCard(q) {
+  const p = q.parsed;
+  const isPending = q.status === 'pending';
+  const isSkipped = q.status === 'skipped';
+  const sym = CUR[S.settings.currency]||'₹';
+
+  const amtStr  = p.amount  ? `${sym}${p.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}` : '—';
+  const descStr = p.merchant || '—';
+  const dateStr = p.date    ? new Date(p.date+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : '—';
+  const payStr  = p.paymentType || '—';
+  const cardStr = p.cardId  ? (getCard(p.cardId)?.name||'') : '';
+
+  const statusColor = isPending ? 'var(--primary)' : isSkipped ? 'var(--ink-3)' : 'var(--green)';
+  const statusIcon  = isPending ? 'pending'        : isSkipped ? 'cancel'       : 'check_circle';
+
+  return `<div class="card" style="margin-bottom:10px;opacity:${isPending?1:.6}">
+    <div style="padding:12px 14px 0;display:flex;align-items:flex-start;gap:8px">
+      <span class="material-icons-round" style="font-size:16px;color:${statusColor};flex-shrink:0;margin-top:2px">${statusIcon}</span>
+      <div style="font-size:11px;color:var(--ink-3);flex:1;line-height:1.5;word-break:break-word">${p.raw.slice(0,120)}${p.raw.length>120?'…':''}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;padding:10px 14px">
+      <div style="padding:4px 0">
+        <div style="font-size:10px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Amount</div>
+        <div style="font-size:14px;font-weight:700;font-family:'DM Mono',monospace;color:var(--red)">${amtStr} ${p.confidence?.amount==='low'?'⚠':''}</div>
+      </div>
+      <div style="padding:4px 0">
+        <div style="font-size:10px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Merchant</div>
+        <div style="font-size:13px;font-weight:500;color:${p.confidence?.merchant==='low'?'var(--yellow)':'var(--ink)'}">${descStr} ${p.confidence?.merchant==='low'?'⚠':''}</div>
+      </div>
+      <div style="padding:4px 0">
+        <div style="font-size:10px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Date</div>
+        <div style="font-size:13px;color:${p.confidence?.date==='low'?'var(--yellow)':'var(--ink)'}">${dateStr} ${p.confidence?.date==='low'?'⚠':''}</div>
+      </div>
+      <div style="padding:4px 0">
+        <div style="font-size:10px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Payment</div>
+        <div style="font-size:13px;color:var(--ink)">${payStr}${cardStr?' · '+cardStr:''} ${p.confidence?.payment==='low'?'⚠':''}</div>
+      </div>
+    </div>
+    ${isPending ? `<div style="display:flex;gap:8px;padding:0 14px 12px">
+      <button class="btn btn-primary" style="flex:1;padding:9px" onclick="openSmsConfirm('${q.id}')">
+        <span class="material-icons-round">edit</span> Review & Save
+      </button>
+      <button class="btn btn-ghost" style="padding:9px 14px" onclick="skipSmsItem('${q.id}')" title="Skip">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>` : `<div style="padding:0 14px 10px;font-size:12px;color:var(--ink-3)">${q.status==='saved'?'✓ Saved as expense':'Skipped'}</div>`}
+  </div>`;
+}
+
+// ── Parse input ──
+function parseSmsInput() {
+  const raw = document.getElementById('smsInput').value.trim();
+  if (!raw) { toast('Paste an SMS first','err'); return; }
+
+  // Split by newlines in case user pastes multiple
+  const messages = raw.split(/\n{2,}/).map(s=>s.trim()).filter(s=>s.length>10);
+  let added=0, skippedCredit=0;
+
+  for (const msg of messages) {
+    const parsed = parseSms(msg);
+    if (parsed.isCredit) { skippedCredit++; continue; }
+    if (!parsed.amount)  { toast('Could not find amount in message','err'); continue; }
+
+    // Deduplicate by raw text
+    if (S.smsQueue.some(q=>q.raw===msg)) { toast('Already in queue','err'); continue; }
+
+    S.smsQueue.unshift({ id:uid(), raw:msg, parsed, status:'pending' });
+    added++;
+  }
+
+  persist();
+  document.getElementById('smsInput').value='';
+  renderSmsPage();
+  updateSmsBadge();
+
+  if (added>0) toast(`${added} message${added>1?'s':''} added to queue`,'ok');
+  if (skippedCredit>0) toast(`${skippedCredit} credit/salary SMS skipped`);
+}
+
+// ── Open confirm sheet ──
+function openSmsConfirm(id) {
+  const q = S.smsQueue.find(x=>x.id===id); if(!q) return;
+  S.activeSmsId = id;
+  const p = q.parsed;
+  const sym = CUR[S.settings.currency]||'₹';
+
+  document.getElementById('smsOriginalText').textContent = p.raw;
+  document.getElementById('smsFDesc').value  = p.merchant || '';
+  document.getElementById('smsFAmt').value   = p.amount   || '';
+  document.getElementById('smsFDate').value  = p.date     || new Date().toISOString().slice(0,10);
+  document.getElementById('smsFPayment').value = p.paymentType || 'UPI';
+  document.getElementById('smsFNotes').value = '';
+  document.getElementById('smsAmtSym').textContent = sym;
+
+  // confidence badges
+  document.getElementById('smsDescConf').outerHTML = confBadge(p.confidence?.merchant||'low')
+    .replace('>', ' id="smsDescConf">');
+  document.getElementById('smsAmtConf').outerHTML  = confBadge(p.confidence?.amount||'low')
+    .replace('>', ' id="smsAmtConf">');
+  document.getElementById('smsDateConf').outerHTML = confBadge(p.confidence?.date||'low')
+    .replace('>', ' id="smsDateConf">');
+  document.getElementById('smsPayConf').outerHTML  = confBadge(p.confidence?.payment||'low')
+    .replace('>', ' id="smsPayConf">');
+
+  // category chips — try to auto-guess from merchant
+  const guessedCat = guessCategoryFromMerchant(p.merchant);
+  renderSmsCatChips(guessedCat);
+
+  // card picker
+  if (p.paymentType==='Credit Card' && S.cards.length>0) {
+    document.getElementById('smsCardPickerGroup').style.display='block';
+    renderSmsCardChips(p.cardId||null);
+  } else {
+    document.getElementById('smsCardPickerGroup').style.display='none';
+  }
+
+  openSheet('smsConfirmSheet');
+}
+
+function onSmsPaymentChange() {
+  const pay = document.getElementById('smsFPayment').value;
+  const grp = document.getElementById('smsCardPickerGroup');
+  if (pay==='Credit Card' && S.cards.length>0) {
+    grp.style.display='block';
+    renderSmsCardChips(null);
+  } else { grp.style.display='none'; }
+}
+
+function renderSmsCatChips(selId) {
+  document.getElementById('smsCatChips').innerHTML = S.categories.map(c=>
+    `<div class="chip ${c.id===selId?'sel':''}" onclick="selSmsChip('${c.id}',this,'smsCatChips')" data-id="${c.id}">${c.emoji} ${c.name}</div>`
+  ).join('');
+}
+function renderSmsCardChips(selId) {
+  document.getElementById('smsCardChips').innerHTML = S.cards.map(c=>
+    `<div class="chip ${c.id===selId?'sel':''}" onclick="selSmsChip('${c.id}',this,'smsCardChips')" data-id="${c.id}" style="${c.id===selId?'background:rgba('+rgb(c.color)+',.15);border-color:'+c.color+';color:'+c.color:''}">
+      <span style="width:10px;height:10px;border-radius:50%;background:${c.color};display:inline-block;flex-shrink:0"></span> ${cardLabel(c)}
+    </div>`
+  ).join('');
+}
+function selSmsChip(id, el, containerId) {
+  document.querySelectorAll(`#${containerId} .chip`).forEach(c=>{
+    c.classList.remove('sel'); c.style.background=''; c.style.borderColor=''; c.style.color='';
+  });
+  el.classList.add('sel');
+  if (containerId==='smsCardChips') {
+    const c=getCard(id);
+    if(c){el.style.background=`rgba(${rgb(c.color)},.15)`;el.style.borderColor=c.color;el.style.color=c.color;}
+  }
+}
+function getSmsCat()  { return document.querySelector('#smsCatChips .chip.sel')?.dataset.id||'other'; }
+function getSmsCard() { return document.querySelector('#smsCardChips .chip.sel')?.dataset.id||null; }
+
+// ── Auto-guess category from merchant name ──
+function guessCategoryFromMerchant(merchant) {
+  if (!merchant) return null;
+  const m = merchant.toLowerCase();
+  if (/swiggy|zomato|uber\s*eat|food|restaurant|cafe|biryani|pizza|burger|domino|kfc|mcd|subway|hotel/.test(m)) return 'food';
+  if (/uber|ola|rapido|metro|bus|train|irctc|railway|petrol|fuel|parking|toll/.test(m)) return 'transport';
+  if (/amazon|flipkart|myntra|ajio|nykaa|meesho|snapdeal|shopping|mart|store/.test(m)) return 'shopping';
+  if (/electricity|water|gas|broadband|airtel|jio|vi |vodafone|bsnl|bill|recharge/.test(m)) return 'bills';
+  if (/apollo|medplus|pharma|hospital|clinic|doctor|health|practo|1mg/.test(m)) return 'health';
+  if (/netflix|hotstar|spotify|prime|bookmyshow|inox|pvr|gaming|steam/.test(m)) return 'entertainment';
+  if (/udemy|coursera|byju|unacademy|school|college|tuition|book/.test(m)) return 'education';
+  if (/salon|spa|gym|fitness|cult\.fit|grooming/.test(m)) return 'personal';
+  return null;
+}
+
+// ── Confirm: save as expense ──
+function confirmSmsItem() {
+  const q = S.smsQueue.find(x=>x.id===S.activeSmsId); if(!q) return;
+  const desc    = document.getElementById('smsFDesc').value.trim();
+  const amt     = parseFloat(document.getElementById('smsFAmt').value);
+  const date    = document.getElementById('smsFDate').value;
+  const payment = document.getElementById('smsFPayment').value;
+  const notes   = document.getElementById('smsFNotes').value.trim();
+  const catId   = getSmsCat();
+
+  if (!desc) { toast('Add a description','err'); return; }
+  if (!amt||amt<=0) { toast('Enter valid amount','err'); return; }
+  if (!date) { toast('Pick a date','err'); return; }
+  let cardId = null;
+  if (payment==='Credit Card' && S.cards.length>0) {
+    cardId = getSmsCard();
+    if (!cardId) { toast('Select a credit card','err'); return; }
+  }
+
+  S.expenses.push({id:uid(),description:desc,amount:amt,date,category:catId,paymentType:payment,notes,cardId,createdAt:new Date().toISOString()});
+  q.status = 'saved';
+  persist();
+  closeSheet('smsConfirmSheet');
+  renderSmsPage();
+  updateSmsBadge();
+  toast('Expense saved ✓','ok');
+}
+
+function skipSmsItem(id) {
+  const q = S.smsQueue.find(x=>x.id===id); if(!q) return;
+  q.status='skipped'; persist(); renderSmsPage(); updateSmsBadge(); toast('Skipped');
+}
+function dismissSmsItem() {
+  skipSmsItem(S.activeSmsId);
+  closeSheet('smsConfirmSheet');
+}
+function clearDoneSms() {
+  S.smsQueue = S.smsQueue.filter(q=>q.status==='pending');
+  persist(); renderSmsPage(); toast('Cleared','ok');
+}
+
+// ── Web Share Target: handle shared text on app load ──
+function handleShareTarget() {
+  const params = new URLSearchParams(window.location.search);
+  const sharedText = params.get('text') || params.get('share-text');
+  if (!sharedText) return;
+  // Clean URL so refresh doesn't re-trigger
+  window.history.replaceState({}, '', window.location.pathname);
+  // Auto-parse and open SMS queue
+  const parsed = parseSms(sharedText.trim());
+  if (parsed.isCredit) { toast('Credit/salary SMS — skipped'); return; }
+  if (!parsed.amount)  { toast('Could not parse amount from shared text','err'); return; }
+  if (S.smsQueue.some(q=>q.raw===sharedText.trim())) { toast('Already in queue'); return; }
+  S.smsQueue.unshift({ id:uid(), raw:sharedText.trim(), parsed, status:'pending' });
+  persist(); updateSmsBadge();
+  // Navigate to SMS page
+  switchNav('more'); showSubPage('sms');
+  toast('SMS added to queue','ok');
+}
+
+// ── CATEGORIES ─────────────────────────────────
+function renderCatList() {
+  document.getElementById('catListEl').innerHTML = S.categories.map(c=>{
+    const count=S.expenses.filter(e=>e.category===c.id).length;
+    const tot=S.expenses.filter(e=>e.category===c.id).reduce((s,e)=>s+e.amount,0);
+    const isDefault=DEFAULT_CATS.some(d=>d.id===c.id);
+    return`<div class="cat-item">
+      <div class="cat-emoji-badge" style="background:rgba(${rgb(c.color)},.15)">${c.emoji}</div>
+      <div class="cat-info"><div class="cat-name-t">${c.name}</div><div class="cat-count">${count} expenses · ${fmt(tot)}</div></div>
+      <div style="width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:8px"></div>
+      ${isDefault?'<div style="width:36px"></div>':`<button class="btn-icon-round" onclick="delCat('${c.id}')"><span class="material-icons-round" style="font-size:18px;color:var(--red)">delete</span></button>`}
+    </div>`;
+  }).join('');
+}
+function openCatSheet() {
+  document.getElementById('cEmoji').value='';
+  document.getElementById('cName').value='';
+  document.getElementById('cColor').value='#1a73e8';
+  openSheet('catSheet');
+}
+function saveCat() {
+  const emoji=document.getElementById('cEmoji').value.trim()||'📦';
+  const name=document.getElementById('cName').value.trim();
+  const color=document.getElementById('cColor').value;
+  if(!name){toast('Enter a name','err');return;}
+  if(S.categories.find(c=>c.name.toLowerCase()===name.toLowerCase())){toast('Already exists','err');return;}
+  S.categories.push({id:uid(),name,emoji,color});
+  persist(); closeSheet('catSheet'); renderCatList(); toast('Category added','ok');
+}
+function delCat(id) {
+  if(S.expenses.some(e=>e.category===id)){toast('In use — reassign first','err');return;}
+  S.categories=S.categories.filter(c=>c.id!==id);
+  persist(); renderCatList(); toast('Deleted');
+}
+
+// ── CREDIT CARDS ───────────────────────────────
+const CARD_COLORS = ['#e53935','#1e88e5','#43a047','#8e24aa','#fb8c00','#00897b','#f4511e','#607d8b','#d81b60','#3949ab'];
+
+function getCard(id) { return S.cards.find(c=>c.id===id) || null; }
+function cardLabel(c) { return c.last4 ? `${c.name} ••${c.last4}` : c.name; }
+
+function renderCardsList() {
+  const el = document.getElementById('cardsListEl');
+  if (!S.cards.length) {
+    el.innerHTML = `<div class="empty"><span class="material-icons-round">credit_card_off</span><p>No cards added yet.<br>Tap "Add Card" to get started.</p></div>`;
+    return;
+  }
+  const sym = CUR[S.settings.currency]||'₹';
+  el.innerHTML = S.cards.map(c => {
+    const moSpent = moExp(S.month,S.year).filter(e=>e.paymentType==='Credit Card'&&e.cardId===c.id).reduce((s,e)=>s+e.amount,0);
+    const totalSpent = S.expenses.filter(e=>e.paymentType==='Credit Card'&&e.cardId===c.id).reduce((s,e)=>s+e.amount,0);
+    const limitPct = c.limit ? Math.min((moSpent/c.limit*100),100).toFixed(1) : null;
+    const limitColor = limitPct ? (limitPct>=90?'var(--red)':limitPct>=70?'var(--yellow)':'var(--green)') : null;
+    return `<div style="background:var(--surface);border-radius:var(--r);box-shadow:var(--sh1);margin-bottom:10px;overflow:hidden">
+      <div style="background:${c.color};padding:14px 16px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="color:white;font-weight:700;font-size:15px">${c.name}</div>
+          ${c.last4?`<div style="color:rgba(255,255,255,.75);font-size:12px;margin-top:2px;font-family:'DM Mono',monospace">•••• •••• •••• ${c.last4}</div>`:''}
+        </div>
+        <button class="btn-icon-round" onclick="delCard('${c.id}')" style="background:rgba(255,255,255,.2);color:white">
+          <span class="material-icons-round" style="font-size:18px">delete</span>
+        </button>
+      </div>
+      <div style="padding:12px 16px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+          <span style="color:var(--ink-3)">This month</span>
+          <span style="font-weight:700;font-family:'DM Mono',monospace;color:var(--ink)">${fmt(moSpent)}</span>
+        </div>
+        ${c.limit ? `
+        <div style="height:6px;background:var(--surface-3);border-radius:4px;overflow:hidden;margin-bottom:4px">
+          <div style="height:100%;width:${limitPct}%;background:${limitColor};border-radius:4px;transition:width .5s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3)">
+          <span style="color:${limitColor};font-weight:700">${limitPct}% of limit used</span>
+          <span>Limit: ${sym}${Number(c.limit).toLocaleString('en-IN')}</span>
+        </div>` : `<div style="font-size:11px;color:var(--ink-3)">All time: ${fmt(totalSpent)}</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openCardSheet(editId) {
+  document.getElementById('ccName').value='';
+  document.getElementById('ccLast4').value='';
+  document.getElementById('ccLimit').value='';
+  document.getElementById('ccLimitSym').textContent=CUR[S.settings.currency]||'₹';
+  // color picker
+  let selColor = CARD_COLORS[S.cards.length % CARD_COLORS.length];
+  document.getElementById('ccColorPicker').innerHTML = CARD_COLORS.map(col=>
+    `<div onclick="selectCardColor('${col}',this)" data-color="${col}" style="width:30px;height:30px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${col===selColor?'var(--ink)':'transparent'};transition:border .15s"></div>`
+  ).join('');
+  document.getElementById('cardSheetTitle').textContent = 'Add Credit Card';
+  document.getElementById('saveCardBtn').textContent = 'Add Card';
+  document.getElementById('saveCardBtn').onclick = saveCard;
+  openSheet('cardSheet');
+}
+function selectCardColor(col, el) {
+  document.querySelectorAll('#ccColorPicker div').forEach(d=>d.style.border=`3px solid ${d.dataset.color===col?'var(--ink)':'transparent'}`);
+}
+function getSelCardColor() {
+  const sel = [...document.querySelectorAll('#ccColorPicker div')].find(d=>d.style.borderColor==='var(--ink)'||d.style.border.includes('var(--ink)'));
+  return sel ? sel.dataset.color : CARD_COLORS[0];
+}
+function saveCard() {
+  const name=document.getElementById('ccName').value.trim();
+  const last4=document.getElementById('ccLast4').value.trim();
+  const limitVal=document.getElementById('ccLimit').value;
+  const limit=limitVal ? parseFloat(limitVal) : null;
+  const color=getSelCardColor();
+  if(!name){toast('Enter card name','err');return;}
+  if(last4 && !/^\d{4}$/.test(last4)){toast('Last 4 must be 4 digits','err');return;}
+  S.cards.push({id:uid(),name,last4:last4||'',color,limit});
+  persist(); closeSheet('cardSheet'); renderCardsList(); toast('Card added','ok');
+}
+function delCard(id) {
+  if(S.expenses.some(e=>e.cardId===id)){
+    if(!confirm('Expenses are linked to this card. Delete anyway? Linked expenses will show as "Unassigned".')){return;}
+  }
+  S.cards=S.cards.filter(c=>c.id!==id);
+  persist(); renderCardsList(); toast('Card removed');
+}
+
+// ── ADD / EDIT EXPENSE ─────────────────────────
+function onPaymentChange() {
+  const pay = document.getElementById('fPayment').value;
+  const grp = document.getElementById('cardPickerGroup');
+  if(pay==='Credit Card' && S.cards.length>0) {
+    grp.style.display='block';
+    renderCardChips(null);
+  } else {
+    grp.style.display='none';
+  }
+}
+function renderCardChips(selId) {
+  document.getElementById('cardChips').innerHTML = S.cards.map(c=>
+    `<div class="chip ${c.id===selId?'sel':''}" onclick="selCardChip('${c.id}',this)" data-id="${c.id}" style="${c.id===selId?'background:rgba('+rgb(c.color)+',.15);border-color:'+c.color+';color:'+c.color:''}">
+      <span style="width:10px;height:10px;border-radius:50%;background:${c.color};display:inline-block;flex-shrink:0"></span> ${cardLabel(c)}
+    </div>`
+  ).join('');
+}
+function selCardChip(id, el) {
+  const c = getCard(id);
+  document.querySelectorAll('#cardChips .chip').forEach(ch=>{
+    const cid=ch.dataset.id; const cc=getCard(cid);
+    ch.classList.remove('sel');
+    ch.style.background=''; ch.style.borderColor=''; ch.style.color='';
+  });
+  el.classList.add('sel');
+  if(c){el.style.background=`rgba(${rgb(c.color)},.15)`;el.style.borderColor=c.color;el.style.color=c.color;}
+}
+function getSelCard() { return document.querySelector('#cardChips .chip.sel')?.dataset.id||null; }
+
+function openAddSheet(date) {
+  S.editId=null;
+  document.getElementById('sheetTitle').textContent='Add Expense';
+  document.getElementById('saveExpBtn').textContent='Add';
+  document.getElementById('fDesc').value='';
+  document.getElementById('fAmt').value='';
+  document.getElementById('fDate').value=date||new Date().toISOString().slice(0,10);
+  document.getElementById('fPayment').value='UPI';
+  document.getElementById('fNotes').value='';
+  document.getElementById('amtSym').textContent=CUR[S.settings.currency]||'₹';
+  document.getElementById('cardPickerGroup').style.display='none';
+  renderCatChips(null);
+  openSheet('expSheet');
+  setTimeout(()=>document.getElementById('fDesc').focus(),300);
+}
+function editExp(id) {
+  const e=S.expenses.find(x=>x.id===id); if(!e) return;
+  S.editId=id;
+  document.getElementById('sheetTitle').textContent='Edit Expense';
+  document.getElementById('saveExpBtn').textContent='Save';
+  document.getElementById('fDesc').value=e.description;
+  document.getElementById('fAmt').value=e.amount;
+  document.getElementById('fDate').value=e.date;
+  document.getElementById('fPayment').value=e.paymentType;
+  document.getElementById('fNotes').value=e.notes||'';
+  document.getElementById('amtSym').textContent=CUR[S.settings.currency]||'₹';
+  renderCatChips(e.category);
+  // card picker
+  if(e.paymentType==='Credit Card' && S.cards.length>0) {
+    document.getElementById('cardPickerGroup').style.display='block';
+    renderCardChips(e.cardId||null);
+  } else {
+    document.getElementById('cardPickerGroup').style.display='none';
+  }
+  openSheet('expSheet');
+}
+function renderCatChips(sel) {
+  document.getElementById('catChips').innerHTML=S.categories.map(c=>
+    `<div class="chip ${c.id===sel?'sel':''}" onclick="selChip('${c.id}',this)" data-id="${c.id}">${c.emoji} ${c.name}</div>`
+  ).join('');
+}
+function selChip(id,el) {
+  document.querySelectorAll('#catChips .chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function getSelCat() { return document.querySelector('#catChips .chip.sel')?.dataset.id||'other'; }
+function saveExp() {
+  const desc=document.getElementById('fDesc').value.trim();
+  const amt=parseFloat(document.getElementById('fAmt').value);
+  const date=document.getElementById('fDate').value;
+  const payment=document.getElementById('fPayment').value;
+  const notes=document.getElementById('fNotes').value.trim();
+  const catId=getSelCat();
+  if(!desc){toast('Add a description','err');return;}
+  if(!amt||amt<=0){toast('Enter valid amount','err');return;}
+  if(!date){toast('Pick a date','err');return;}
+  // card validation
+  let cardId = null;
+  if(payment==='Credit Card' && S.cards.length>0) {
+    cardId = getSelCard();
+    if(!cardId){toast('Select a credit card','err');return;}
+  }
+  if(S.editId) {
+    const i=S.expenses.findIndex(e=>e.id===S.editId);
+    S.expenses[i]={...S.expenses[i],description:desc,amount:amt,date,category:catId,paymentType:payment,notes,cardId};
+    toast('Updated','ok');
+  } else {
+    S.expenses.push({id:uid(),description:desc,amount:amt,date,category:catId,paymentType:payment,notes,cardId,createdAt:new Date().toISOString()});
+    toast('Added ✓','ok');
+  }
+  persist(); closeSheet('expSheet'); refreshActive();
+}
+function delExp(id) {
+  S.expenses=S.expenses.filter(e=>e.id!==id);
+  persist();
+  const el=document.getElementById('ei-'+id);
+  if(el){el.style.transition='.2s';el.style.opacity='0';el.style.transform='translateX(16px)';setTimeout(()=>el.remove(),200);}
+  renderHome(); toast('Deleted');
+}
+
+// ── EXPORT ─────────────────────────────────────
+function initExport() {
+  const ms=document.getElementById('exportMonth');
+  const ys=document.getElementById('exportYear');
+  ms.innerHTML=FMONTHS.map((m,i)=>`<option value="${i}" ${i===S.month?'selected':''}>${m}</option>`).join('');
+  ys.innerHTML='';
+  const ty=new Date().getFullYear();
+  for(let y=ty;y>=ty-5;y--) ys.innerHTML+=`<option value="${y}" ${y===S.year?'selected':''}>${y}</option>`;
+  ms.onchange=ys.onchange=updatePreview;
+  updatePreview();
+}
+function updatePreview() {
+  const m=parseInt(document.getElementById('exportMonth').value);
+  const y=parseInt(document.getElementById('exportYear').value);
+  const type=document.getElementById('exportPreviewType').value;
+  const exps=moExp(m,y).sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('exportPreview').textContent=buildExport(exps,m,y,type);
+}
+function buildExport(exps,m,y,type) {
+  const sym=CUR[S.settings.currency]||'₹', cur=S.settings.currency;
+  if(type==='csv') {
+    return ['Date,Description,Category,Amount,Currency,Payment,Notes',
+      ...exps.map(e=>`${e.date},"${e.description}","${cat(e.category).name}",${e.amount},${cur},${e.paymentType},"${e.notes||''}"`)
+    ].join('\n');
+  } else if(type==='json') {
+    return JSON.stringify({month:FMONTHS[m],year:y,currency:cur,total:exps.reduce((s,e)=>s+e.amount,0),count:exps.length,
+      expenses:exps.map(e=>({...e,categoryName:cat(e.category).name,cardName:e.cardId?getCard(e.cardId)?.name||'':null,currency:cur}))},null,2);
+  } else {
+    const total=exps.reduce((s,e)=>s+e.amount,0);
+    const cm={};exps.forEach(e=>{const cn=cat(e.category).name;cm[cn]=(cm[cn]||0)+e.amount;});
+    let t=`EXPENSE REPORT — ${FMONTHS[m]} ${y}\n${'='.repeat(38)}\nCurrency: ${cur}\nTotal: ${sym}${total.toFixed(2)}\nTransactions: ${exps.length}\n\nCATEGORY SUMMARY:\n`;
+    Object.entries(cm).sort((a,b)=>b[1]-a[1]).forEach(([c,a])=>{t+=`  ${c}: ${sym}${a.toFixed(2)} (${(a/total*100).toFixed(1)}%)\n`;});
+    t+=`\nTRANSACTIONS:\n${'-'.repeat(38)}\n`;
+    exps.forEach(e=>{
+      const cn=e.cardId?getCard(e.cardId)?.name:null;
+      t+=`[${e.date}] ${e.description}\n  ${cat(e.category).name} | ${sym}${e.amount.toFixed(2)} | ${e.paymentType}${cn?' ('+cn+')':''}${e.notes?'\n  Note: '+e.notes:''}\n\n`;
+    });
+    return t;
+  }
+}
+function doExport(type) {
+  const m=parseInt(document.getElementById('exportMonth').value);
+  const y=parseInt(document.getElementById('exportYear').value);
+  const exps=moExp(m,y).sort((a,b)=>a.date.localeCompare(b.date));
+  const content=buildExport(exps,m,y,type);
+  const ext=type==='csv'?'csv':type==='json'?'json':'txt';
+  const mime=type==='csv'?'text/csv':type==='json'?'application/json':'text/plain';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download=`spendwise_${FMONTHS[m].toLowerCase()}_${y}.${ext}`;
+  a.click(); toast('Exported','ok');
+}
+
+// ── SETTINGS ───────────────────────────────────
+function renderSettings() {
+  document.getElementById('currencySelect').value=S.settings.currency;
+  const sym=CUR[S.settings.currency]||'₹';
+  document.getElementById('currencyDesc').textContent=`${document.getElementById('currencySelect').selectedOptions[0]?.text||'INR'} (${sym})`;
+  document.getElementById('notifToggle').classList.toggle('on',!!S.settings.notif);
+}
+function saveCurrency() {
+  S.settings.currency=document.getElementById('currencySelect').value;
+  persist(); renderSettings(); toast('Currency updated','ok');
+}
+function toggleNotif() {
+  if(!S.settings.notif) {
+    Notification.requestPermission().then(async p=>{
+      if(p==='granted'){
+        S.settings.notif=true; persist(); renderSettings(); toast('Reminders on','ok');
+        scheduleNotif();
+        // Also wire up SW-based reminder
+        if('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if(reg) schedulePushReminder(reg);
+        }
+      } else toast('Permission denied','err');
+    });
+  } else { S.settings.notif=false; persist(); renderSettings(); toast('Reminders off'); }
+}
+function scheduleNotif() {
+  if(!S.settings.notif||Notification.permission!=='granted') return;
+  const today=new Date().toISOString().slice(0,10);
+  if(!S.expenses.some(e=>e.date===today))
+    new Notification('Spendwise',{body:"Don't forget to log today's expenses! 💰"});
+}
+function clearData() {
+  if(!confirm('Delete ALL data? Cannot be undone.')) return;
+  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; persist();
+  hideSubPage(); switchNav('home'); toast('Data cleared');
+}
+
+// ── SHEET UTILS ────────────────────────────────
+function openSheet(id) { document.getElementById(id).classList.add('open'); }
+function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(o=>{
+  o.addEventListener('click',e=>{ if(e.target===o) closeSheet(o.id); });
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.overlay.open').forEach(o=>closeSheet(o.id)); });
+
+// ── TOAST ──────────────────────────────────────
+function toast(msg,type='') {
+  const el=document.createElement('div');
+  el.className='toast '+(type==='ok'?'ok':type==='err'?'err':'');
+  const icon=type==='ok'?'check_circle':type==='err'?'error':'info';
+  el.innerHTML=`<span class="material-icons-round">${icon}</span>${msg}`;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(()=>{el.style.transition='.3s';el.style.opacity='0';},2200);
+  setTimeout(()=>el.remove(),2500);
+}
+
+// ── SERVICE WORKER + PWA ───────────────────────
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    // Once SW controls the page, schedule daily reminder if enabled
+    if (S.settings.notif && Notification.permission === 'granted') {
+      schedulePushReminder(reg);
+    }
+    // Listen for messages from SW (e.g. SW activated)
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'SW_READY') console.log('Spendwise SW ready');
+    });
+  } catch(err) {
+    console.warn('SW registration failed:', err);
+  }
+}
+
+async function schedulePushReminder(reg) {
+  // Store last-entry date in SW scope so it can decide whether to notify
+  const today = new Date().toISOString().slice(0,10);
+  const lastEntry = S.expenses.length
+    ? [...S.expenses].sort((a,b)=>b.date.localeCompare(a.date))[0].date
+    : null;
+  if (reg && reg.active) {
+    reg.active.postMessage({
+      type: 'SCHEDULE_REMINDER',
+      lastEntry,
+      today,
+      reminderHour: S.settings.reminderHour ?? 21  // 9pm default
+    });
+  }
+}
+
+// ── INIT ───────────────────────────────────────
+(function init() {
+  load();
+  updateMonthLabel();
+
+  // Sample data if empty
+  if(S.expenses.length===0) {
+    const y=S.year, m=S.month;
+    const pad=n=>String(n).padStart(2,'0');
+    [
+      [1,'Dinner at restaurant',850,'food','UPI','Friends outing'],
+      [3,'Metro recharge',200,'transport','UPI',''],
+      [5,'Grocery shopping',1250,'food','Debit Card','Weekly'],
+      [7,'Electricity bill',1800,'bills','Net Banking','Monthly'],
+      [9,'Movie tickets',600,'entertainment','Credit Card','Weekend'],
+      [11,'Cab ride',320,'transport','UPI',''],
+      [14,'Online course',2999,'education','Credit Card','React'],
+      [16,'Pharmacy',450,'health','Cash','Medicines'],
+      [18,'Coffee & snacks',380,'food','UPI',''],
+      [20,'Gym membership',1200,'health','Credit Card','Monthly'],
+    ].forEach(([d,desc,amt,catId,pay,notes])=>{
+      S.expenses.push({id:uid(),description:desc,amount:amt,date:`${y}-${pad(m+1)}-${pad(d)}`,category:catId,paymentType:pay,notes,createdAt:new Date().toISOString()});
+    });
+    persist();
+  }
+
+  renderHome();
+  if(S.settings.notif) scheduleNotif();
+  registerSW();
+  updateSmsBadge();
+  handleShareTarget();
+})();
+</script>
+</body>
+</html>
