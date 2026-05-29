@@ -60,34 +60,40 @@ body {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center;
-  padding: 0 16px;
-  gap: 10px;
+  padding: 0 12px;
+  gap: 8px;
   z-index: 100;
   box-shadow: var(--sh1);
+  overflow: hidden;
 }
 .topbar-logo {
   display: flex; align-items: center; gap: 8px;
   font-size: 18px; font-weight: 700; color: var(--ink);
+  flex-shrink: 0;
 }
 .topbar-logo .logo-dot {
   width: 30px; height: 30px; border-radius: 8px;
   background: var(--primary);
   display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 .topbar-logo .logo-dot .material-icons-round { font-size: 17px; color: white; }
-.topbar-spacer { flex: 1; }
+.topbar-logo .logo-wordmark { display: none; }
+.topbar-spacer { flex: 1; min-width: 0; }
 .topbar-month {
-  display: flex; align-items: center; gap: 2px;
+  display: flex; align-items: center; gap: 0;
   background: var(--surface-3);
   border-radius: 24px;
-  padding: 4px 10px;
-  font-size: 13px; font-weight: 600;
+  padding: 4px 6px;
+  font-size: 12px; font-weight: 600;
   color: var(--ink-2);
   cursor: pointer;
   user-select: none;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
-.topbar-month .material-icons-round { font-size: 16px; }
-.topbar-month span { min-width: 76px; text-align: center; }
+.topbar-month .material-icons-round { font-size: 18px; }
+.topbar-month span { min-width: 0; text-align: center; padding: 0 2px; }
 .topbar-add {
   width: 36px; height: 36px; border-radius: 50%;
   background: var(--primary); color: white;
@@ -96,6 +102,13 @@ body {
   flex-shrink: 0;
 }
 .topbar-add .material-icons-round { font-size: 22px; }
+
+/* Show logo wordmark on wider screens */
+@media (min-width: 420px) {
+  .topbar-logo .logo-wordmark { display: inline; }
+  .topbar { padding: 0 16px; gap: 10px; }
+  .topbar-month { padding: 4px 10px; gap: 2px; font-size: 13px; }
+}
 
 /* ─── SCROLL AREA ────────────────────────── */
 .scroll-area {
@@ -515,7 +528,7 @@ body {
 <header class="topbar">
   <div class="topbar-logo">
     <div class="logo-dot"><span class="material-icons-round">account_balance_wallet</span></div>
-    Spendwise
+    <span class="logo-wordmark">Spendwise</span>
   </div>
   <div class="topbar-spacer"></div>
   <div class="topbar-month">
