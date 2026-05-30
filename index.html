@@ -1166,39 +1166,45 @@ const PAYMENT_TYPES = ['UPI','Cash','Credit Card','Debit Card','Net Banking','Ot
 
 // ── PERSIST ────────────────────────────────────
 function load() {
+  const raw = localStorage.getItem('sw2');
+  if (!raw) { S.categories = [...DEFAULT_CATS]; return; }
+
+  let d;
+  try { d = JSON.parse(raw); } catch(e) {
+    console.error('Spendwise: corrupt localStorage, resetting categories only', e);
+    S.categories = [...DEFAULT_CATS]; return;
+  }
+
+  // Restore all fields with safe fallbacks — never lose data
+  S.expenses   = Array.isArray(d.expenses)   ? d.expenses   : [];
+  S.categories = Array.isArray(d.categories) ? d.categories : [...DEFAULT_CATS];
+  S.customSubs = (d.customSubs && typeof d.customSubs==='object') ? d.customSubs : {};
+  S.cards      = Array.isArray(d.cards)      ? d.cards      : [];
+  S.smsQueue   = Array.isArray(d.smsQueue)   ? d.smsQueue   : [];
+  S.settings   = { ...S.settings, ...(d.settings||{}) };
+
+  // ── Migration: rename old 'health' → 'medical' ──
+  // Run in its own try so a migration bug never wipes restored data
   try {
-    const d = JSON.parse(localStorage.getItem('sw2') || 'null');
-    if (d) {
-      S.expenses   = d.expenses   || [];
-      S.categories = d.categories || DEFAULT_CATS;
-      S.customSubs = d.customSubs || {};
-      S.cards      = d.cards      || [];
-      S.smsQueue   = d.smsQueue   || [];
-      S.settings   = { ...S.settings, ...d.settings };
+    S.expenses.forEach(e => { if(e.category==='health') e.category='medical'; });
+    const hIdx = S.categories.findIndex(c=>c.id==='health');
+    if(hIdx>-1) {
+      S.categories[hIdx].id='medical';
+      S.categories[hIdx].name='Medical & Health';
+      S.categories[hIdx].emoji='🏥';
+    }
 
-      // ── Migration: rename old 'health' → 'medical' ──
-      S.expenses.forEach(e => { if(e.category==='health') e.category='medical'; });
-      const hIdx = S.categories.findIndex(c=>c.id==='health');
-      if(hIdx>-1) {
-        S.categories[hIdx].id='medical';
-        S.categories[hIdx].name='Medical & Health';
-        S.categories[hIdx].emoji='🏥';
-      }
+    const savedIds = new Set(S.categories.map(c=>c.id));
+    let migrated = false;
+    DEFAULT_CATS.forEach(dc => {
+      if(!savedIds.has(dc.id)) { S.categories.push({...dc}); migrated=true; }
+    });
 
-      // Build savedIds AFTER rename so we don't get duplicates
-      const savedIds = new Set(S.categories.map(c=>c.id));
-
-      // Add any new default categories not yet in saved list
-      let migrated = false;
-      DEFAULT_CATS.forEach(dc => {
-        if(!savedIds.has(dc.id)) { S.categories.push({...dc}); migrated=true; }
-      });
-
-      // Persist immediately if anything was migrated
-      if(migrated || hIdx>-1) persist();
-
-    } else { S.categories = [...DEFAULT_CATS]; }
-  } catch { S.categories = [...DEFAULT_CATS]; }
+    if(migrated || hIdx>-1) persist();
+  } catch(e) {
+    console.error('Spendwise: migration error (data preserved)', e);
+    // Data is already loaded above — migration failed but cards/expenses are safe
+  }
 }
 function persist() {
   localStorage.setItem('sw2', JSON.stringify({
@@ -1516,38 +1522,210 @@ function renderAnalytics(tab) {
         const tot=exps.reduce((s,e)=>s+e.amount,0);
         rows.push({label:MONTHS[m]+' '+y, total:tot, count:exps.length, m, y});
       }
-      const grandTotal = rows.reduce((s,r)=>s+r.total,0);
-      const mx  = Math.max(...rows.map(r=>r.total),1);
-      const avg6 = grandTotal/6;
-      const curRow = rows[rows.length-1];
-      const vsAvg = avg6 ? ((curRow.total-avg6)/avg6*100).toFixed(1) : null;
+      const grandTotal  = rows.reduce((s,r)=>s+r.total,0);
+      const mx          = Math.max(...rows.map(r=>r.total),1);
+      const curRow      = rows[rows.length-1];
+      // Avg based on PAST 5 months only — exclude current month so it's a true baseline
+      const pastRows    = rows.slice(0,-1); // all except current
+      const pastActive  = pastRows.filter(r=>r.total>0);
+      const avgActive   = pastActive.length ? pastActive.reduce((s,r)=>s+r.total,0)/pastActive.length : 0;
+      const vsAvg       = avgActive ? ((curRow.total-avgActive)/avgActive*100).toFixed(1) : null;
+      // Highest/lowest across all 6 months
+      const activeRows  = rows.filter(r=>r.total>0);
+      const highRow     = activeRows.length ? [...activeRows].sort((a,b)=>b.total-a.total)[0] : null;
+      const lowRow      = activeRows.length>1 ? [...activeRows].sort((a,b)=>a.total-b.total)[0] : null;
+      const isAboveAvg  = vsAvg!==null && parseFloat(vsAvg)>0;
+      const isBelowAvg  = vsAvg!==null && parseFloat(vsAvg)<0;
+      const sym = CUR[S.settings.currency]||'₹';
+
+      // ── Build 6-month weekly heatmap data ──
+      // Collect all weeks across the 6-month window
+      // A "week" = Mon-Sun ISO week, but we bin by calendar week of each month
+      // Structure: array of {weekLabel, mo, yr, days: [{date,amount,dow}]}
+
+      // Get start date = 1st of oldest month in range
+      let startM = S.month-5, startY = S.year;
+      if (startM<0){startM+=12;startY--;}
+      const startDate = new Date(startY, startM, 1);
+      const endDate   = new Date(S.year, S.month+1, 0); // last day of current month
+
+      // Build day-level data for the entire range
+      const dayMap = {}; // 'YYYY-MM-DD' → amount
+      S.expenses.forEach(e => {
+        if (!e.date) return;
+        const d = new Date(e.date+'T00:00');
+        if (d >= startDate && d <= endDate) {
+          dayMap[e.date] = (dayMap[e.date]||0) + e.amount;
+        }
+      });
+
+      // Build week columns: each column = one week (Mon–Sun)
+      // We go day by day from startDate, group into weeks
+      // Week starts on Monday
+      const weeks = []; // [{days:[{date,amount,m}], monthLabel}]
+      let cur = new Date(startDate);
+      // Align to Monday on or before startDate
+      const dow0 = cur.getDay(); // 0=Sun
+      const daysBack = dow0===0 ? 6 : dow0-1;
+      cur.setDate(cur.getDate()-daysBack);
+
+      while (cur <= endDate) {
+        const week = {days:[]};
+        for (let d=0;d<7;d++) {
+          const dateStr = cur.toISOString().slice(0,10);
+          const inRange = cur>=startDate && cur<=endDate;
+          week.days.push({
+            date: dateStr,
+            amount: inRange ? (dayMap[dateStr]||0) : null, // null = out of range
+            m: cur.getMonth(),
+            y: cur.getFullYear(),
+            d: cur.getDate()
+          });
+          cur.setDate(cur.getDate()+1);
+        }
+        weeks.push(week);
+      }
+
+      // Color scale
+      const allAmts = Object.values(dayMap).filter(v=>v>0);
+      const heatMax = allAmts.length ? Math.max(...allAmts) : 1;
+      const p75 = allAmts.sort((a,b)=>a-b)[Math.floor(allAmts.length*.75)]||heatMax;
+      const p50 = allAmts[Math.floor(allAmts.length*.5)]||heatMax;
+      const p25 = allAmts[Math.floor(allAmts.length*.25)]||heatMax;
+
+      function weekHeatColor(amt) {
+        if (amt===null) return 'transparent';
+        if (amt===0) return 'var(--surface-3)';
+        if (amt>=p75) return '#1a73e8';
+        if (amt>=p50) return '#4a90d9';
+        if (amt>=p25) return '#7fb3e8';
+        return '#b8d4f5';
+      }
+
+      // Month label row — place label at first week of each month
+      const monthLabelMap = {}; // weekIdx → label
+      weeks.forEach((wk,wi)=>{
+        // Find if this week contains the 1st of a month that's in range
+        wk.days.forEach(day=>{
+          if (day.amount!==null && day.d===1) {
+            monthLabelMap[wi] = MONTHS[day.m];
+          }
+        });
+      });
+
+      // Render: rows = days of week (Mon-Sun), cols = weeks
+      const DAY_LABELS = ['M','T','W','T','F','S','S'];
+      const cellSize = Math.max(Math.floor((Math.min(window?.innerWidth||360, 380) - 60) / weeks.length), 8);
+      const cs = Math.min(cellSize, 18); // cap cell size
+
+      // Build grid HTML — transpose: rows=days, cols=weeks
+      let gridRows = '';
+      for (let day=0;day<7;day++) {
+        let row = `<div style="display:flex;align-items:center;gap:2px">
+          <div style="width:10px;font-size:8px;color:var(--ink-3);text-align:right;flex-shrink:0">${DAY_LABELS[day]}</div>`;
+        weeks.forEach((wk,wi)=>{
+          const cell = wk.days[day];
+          const amt = cell.amount;
+          const isToday = cell.date===new Date().toISOString().slice(0,10);
+          const tip = amt>0 ? `${cell.date}: ${sym}${Math.round(amt).toLocaleString('en-IN')}` : cell.date;
+          row += `<div title="${tip}" style="
+            width:${cs}px;height:${cs}px;border-radius:2px;
+            background:${weekHeatColor(amt)};flex-shrink:0;
+            border:${isToday?'1px solid var(--primary)':'1px solid transparent'};
+            cursor:default"
+            onmouseover="this.title='${tip}'"
+          ></div>`;
+        });
+        row += '</div>';
+        gridRows += row;
+      }
+
+      // Month labels row
+      let monthRow = `<div style="display:flex;align-items:center;gap:2px;margin-bottom:3px">
+        <div style="width:10px;flex-shrink:0"></div>`;
+      weeks.forEach((wk,wi)=>{
+        monthRow += `<div style="width:${cs}px;flex-shrink:0;font-size:8px;font-weight:700;color:${monthLabelMap[wi]?'var(--ink-2)':'transparent'};overflow:visible;white-space:nowrap">
+          ${monthLabelMap[wi]||''}
+        </div>`;
+      });
+      monthRow += '</div>';
+
+      // Busiest day in period
+      const busiestDate = Object.entries(dayMap).sort((a,b)=>b[1]-a[1])[0];
+      const busiestD = busiestDate ? new Date(busiestDate[0]+'T00:00') : null;
 
       el.innerHTML=`
+        ${toggle}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div class="stat-card" style="--accent:var(--primary)">
             <div class="stat-label">6-Month Total</div>
             <div class="stat-val" style="font-size:18px">${fmt(grandTotal)}</div>
-            <div class="stat-sub">${rows.filter(r=>r.total>0).length} active months</div>
+            <div class="stat-sub">${activeRows.length} of 6 months active</div>
           </div>
           <div class="stat-card" style="--accent:var(--yellow)">
-            <div class="stat-label">Monthly Avg</div>
-            <div class="stat-val" style="font-size:18px">${fmt(avg6)}</div>
-            <div class="stat-sub">${vsAvg!==null?(vsAvg>0?'▲ '+vsAvg+'% this month':'▼ '+Math.abs(vsAvg)+'% this month'):'No comparison'}</div>
+            <div class="stat-label">Avg / Month (past 5)</div>
+            <div class="stat-val" style="font-size:18px">${fmt(avgActive)}</div>
+            <div class="stat-sub" style="color:${isAboveAvg?'var(--red)':isBelowAvg?'var(--green)':'var(--ink-3)'};font-weight:${vsAvg?600:400}">
+              ${vsAvg!==null
+                ? (isAboveAvg?'▲ '+vsAvg+'% vs past avg':isBelowAvg?'▼ '+Math.abs(vsAvg)+'% vs past avg':'= past avg')
+                : pastActive.length===0?'No past data':''}
+            </div>
+          </div>
+          <div class="stat-card" style="--accent:var(--red)">
+            <div class="stat-label">Highest Month</div>
+            <div class="stat-val" style="font-size:16px;margin-top:3px">${highRow&&highRow.total>0?highRow.label:'—'}</div>
+            <div class="stat-sub">${highRow&&highRow.total>0?fmt(highRow.total):''}</div>
+          </div>
+          <div class="stat-card" style="--accent:var(--green)">
+            <div class="stat-label">Lowest Active</div>
+            <div class="stat-val" style="font-size:16px;margin-top:3px">${lowRow?lowRow.label:'—'}</div>
+            <div class="stat-sub">${lowRow?fmt(lowRow.total):'Need 2+ months'}</div>
           </div>
         </div>
-        ${toggle}
-        <div class="card"><div class="card-head">
-          <span class="card-title">6-Month Spending</span>
-          <span style="font-size:11px;color:var(--ink-3)">% of period total</span>
-        </div><div class="card-body"><div class="bar-list">${
-          rows.map(r=>{
-            const isCur = r.m===S.month && r.y===S.year;
-            return barRow(
-              `<span style="font-weight:${isCur?700:400};color:${isCur?'var(--primary)':'var(--ink-2)'}">${r.label}</span>`,
-              r.total, grandTotal, mx, isCur?'var(--primary)':'#c5cae9'
-            );
-          }).join('')
-        }</div></div></div>`;
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-head">
+            <span class="card-title">6-Month Spending</span>
+            <span style="font-size:11px;color:var(--ink-3)">% of period total</span>
+          </div>
+          <div class="card-body">
+            <div class="bar-list">${
+              rows.map(r=>{
+                const isCur = r.m===S.month && r.y===S.year;
+                return barRow(
+                  `<span style="font-weight:${isCur?700:400};color:${isCur?'var(--primary)':'var(--ink-2)'}">${r.label}</span>`,
+                  r.total, grandTotal, mx, isCur?'var(--primary)':'#c5cae9'
+                );
+              }).join('')
+            }</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Weekly Activity</span>
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="font-size:10px;color:var(--ink-3)">Less</span>
+              ${['var(--surface-3)','#b8d4f5','#7fb3e8','#4a90d9','#1a73e8'].map(c=>
+                `<div style="width:10px;height:10px;border-radius:2px;background:${c}"></div>`
+              ).join('')}
+              <span style="font-size:10px;color:var(--ink-3)">More</span>
+            </div>
+          </div>
+          <div class="card-body" style="overflow-x:auto;padding:12px 14px">
+            <div style="min-width:${weeks.length*(cs+2)+16}px">
+              ${monthRow}
+              <div style="display:flex;flex-direction:column;gap:2px">${gridRows}</div>
+            </div>
+            ${busiestDate ? `
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--ink-2)">
+              🔥 Busiest day:
+              <strong style="color:var(--primary)">
+                ${busiestD.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}
+              </strong>
+              — ${fmt(busiestDate[1])}
+            </div>` : ''}
+          </div>
+        </div>`;
 
     // ── COMPARE VIEW ──
     } else {
@@ -1598,6 +1776,7 @@ function renderAnalytics(tab) {
       const deltaIcon  = isUp ? '▲' : '▼';
 
       el.innerHTML=`
+        ${toggle}
         <!-- Top summary -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div class="stat-card" style="--accent:var(--primary)">
@@ -1613,8 +1792,6 @@ function renderAnalytics(tab) {
             </div>
           </div>
         </div>
-        ${toggle}
-        ${compareToggle}
 
         <!-- Overall delta banner -->
         ${curTotal>0||baseTotal>0 ? `
@@ -1630,11 +1807,27 @@ function renderAnalytics(tab) {
           </div>
         </div>` : ''}
 
-        <!-- Per-category comparison -->
+        <!-- Per-category comparison — sub-toggle lives in card header -->
         <div class="card">
-          <div class="card-head">
+          <div class="card-head" style="flex-wrap:wrap;gap:8px">
             <span class="card-title">By Category</span>
-            <div style="display:flex;align-items:center;gap:10px;font-size:11px;color:var(--ink-3)">
+            <div style="display:flex;background:var(--surface-3);border-radius:16px;padding:2px;gap:1px;margin-left:auto">
+              <button onclick="setCompareMode('prev')"
+                style="padding:4px 10px;border:none;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;
+                background:${_compareMode==='prev'?'var(--surface)':'transparent'};
+                color:${_compareMode==='prev'?'var(--primary)':'var(--ink-3)'};
+                box-shadow:${_compareMode==='prev'?'var(--sh1)':'none'};transition:all .15s;white-space:nowrap">
+                vs Last Month
+              </button>
+              <button onclick="setCompareMode('year')"
+                style="padding:4px 10px;border:none;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;
+                background:${_compareMode==='year'?'var(--surface)':'transparent'};
+                color:${_compareMode==='year'?'var(--primary)':'var(--ink-3)'};
+                box-shadow:${_compareMode==='year'?'var(--sh1)':'none'};transition:all .15s;white-space:nowrap">
+                vs Last Year
+              </button>
+            </div>
+            <div style="width:100%;display:flex;align-items:center;gap:10px;font-size:11px;color:var(--ink-3);padding-top:2px">
               <span style="display:flex;align-items:center;gap:4px">
                 <span style="width:10px;height:10px;border-radius:2px;background:var(--primary);display:inline-block"></span>${curLabel}
               </span>
@@ -1706,7 +1899,7 @@ function renderAnalytics(tab) {
         <div class="stat-card" style="--accent:var(--primary)">
           <div class="stat-label">Categories Used</div>
           <div class="stat-val">${sortedMains.length}</div>
-          <div class="stat-sub">of ${S.categories.length} total</div>
+          <div class="stat-sub">${sortedMains.length===S.categories.length?'All categories active':'of '+S.categories.length+' configured'}</div>
         </div>
         <div class="stat-card" style="--accent:var(--red)">
           <div class="stat-label">${isDetailed()&&topSubC?'Top Sub':'Biggest Spend'}</div>
@@ -1767,7 +1960,11 @@ function renderAnalytics(tab) {
           </div>`).join('')}
       </div>`;
 
-      let subContent = '<div class="empty"><span class="material-icons-round">label_off</span><p>No sub-categories set this month</p></div>';
+      let subContent = `<div class="empty">
+        <span class="material-icons-round">label_off</span>
+        <p>No sub-categories tagged this month.</p>
+        <p style="margin-top:6px;font-size:12px">When adding expenses, switch to Detailed mode in Settings to tag sub-categories.</p>
+      </div>`;
 
       if (_analyticsSubParent) {
         const parentCat    = cat(_analyticsSubParent);
@@ -1919,8 +2116,12 @@ function renderAnalytics(tab) {
     // Top spending day
     const topCell = [...cells].filter(c=>isAmt?c.amount>0:c.count>0).sort((a,b)=>isAmt?b.amount-a.amount:b.count-a.count)[0];
     const topDow  = metric.indexOf(Math.max(...metric));
-    const totalTxn = cells.reduce((s,c)=>s+c.count,0);
     const activeDays = cells.filter(c=>c.amount>0).length;
+
+    // Weekend highlight: only if weekends are actually higher than weekdays
+    const weekdayAvg = [1,2,3,4,5].reduce((s,i)=>s+metric[i],0)/5;
+    const weekendAvg = [0,6].reduce((s,i)=>s+metric[i],0)/2;
+    const weekendsHigher = weekendAvg > weekdayAvg;
 
     el.innerHTML=`
       <!-- Stat cards -->
@@ -1931,29 +2132,14 @@ function renderAnalytics(tab) {
           <div class="stat-sub">of ${daysInMonth} days · ${Math.round(activeDays/daysInMonth*100)}%</div>
         </div>
         <div class="stat-card" style="--accent:var(--red)">
-          <div class="stat-label">Busiest ${isAmt?'Day':'Day'}</div>
+          <div class="stat-label">${isAmt?'Busiest Day':'Most Active Day'}</div>
           <div class="stat-val" style="font-size:16px;margin-top:3px">${topCell?(DAYS[topCell.dow]+' '+topCell.d):'—'}</div>
           <div class="stat-sub">${topCell?(isAmt?fmt(topCell.amount):topCell.count+' transactions'):'No data'}</div>
         </div>
       </div>
 
-      <!-- Toggle -->
-      <div style="display:flex;background:var(--surface-3);border-radius:20px;padding:3px;gap:2px;margin-bottom:14px">
-        <button onclick="setHabitsMetric('amount')"
-          style="flex:1;padding:6px 0;border:none;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;
-          background:${isAmt?'var(--surface)':'transparent'};
-          color:${isAmt?'var(--primary)':'var(--ink-3)'};
-          box-shadow:${isAmt?'var(--sh1)':'none'};transition:all .15s">
-          💰 Amount Spent
-        </button>
-        <button onclick="setHabitsMetric('count')"
-          style="flex:1;padding:6px 0;border:none;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;
-          background:${!isAmt?'var(--surface)':'transparent'};
-          color:${!isAmt?'var(--primary)':'var(--ink-3)'};
-          box-shadow:${!isAmt?'var(--sh1)':'none'};transition:all .15s">
-          🔢 Transaction Count
-        </button>
-      </div>
+      <!-- Toggle using segControl -->
+      ${segControl([['amount','💰 Amount Spent'],['count','🔢 Transaction Count']], _habitsMetric, 'setHabitsMetric')}
 
       <!-- Calendar heatmap -->
       <div class="card" style="margin-bottom:14px">
@@ -1993,7 +2179,7 @@ function renderAnalytics(tab) {
               const val = metric[i];
               const h   = Math.max((val/metricMax)*88, val>0?4:2);
               const isTop = i===topDow;
-              const isWeekend = i===0||i===6;
+              const isWeekend = (i===0||i===6) && weekendsHigher;
               return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end">
                 <div style="font-size:9px;color:${isTop?'var(--primary)':'var(--ink-3)'};font-family:'DM Mono',monospace;font-weight:${isTop?700:400}">
                   ${isAmt?(val>0?sym+Math.round(val/100)/10+'K':''):(val>0?val.toFixed(1):'')}
