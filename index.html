@@ -598,6 +598,7 @@ body {
       <div class="tab-btn active" onclick="switchAnalytics('monthly',this)">Monthly</div>
       <div class="tab-btn" onclick="switchAnalytics('category',this)">Category</div>
       <div class="tab-btn" onclick="switchAnalytics('payment',this)">Payment</div>
+      <div class="tab-btn" onclick="switchAnalytics('habits',this)">Habits</div>
     </div>
     <div id="analyticsBody"></div>
   </div>
@@ -677,10 +678,15 @@ body {
 
     <!-- CATEGORIES SUBPAGE -->
     <div id="sub-categories" style="display:none">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
         <button class="btn-icon-round" onclick="hideSubPage()"><span class="material-icons-round">arrow_back</span></button>
         <span style="font-size:16px;font-weight:700">Categories</span>
-        <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px" onclick="openCatSheet()"><span class="material-icons-round">add</span> Add</button>
+        <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px" onclick="openCatSheet(null)">
+          <span class="material-icons-round">add</span> Add
+        </button>
+      </div>
+      <div style="font-size:12px;color:var(--ink-3);margin-bottom:14px;padding-left:4px">
+        Tap a category to expand sub-categories
       </div>
       <div id="catListEl"></div>
     </div>
@@ -750,10 +756,26 @@ body {
         </div>
         <div class="toggle-wrap">
           <div class="toggle-info">
+            <h4>Category Mode</h4>
+            <p id="catModeDesc">Simple — one tap, main category only</p>
+          </div>
+          <div class="toggle" id="catModeToggle" onclick="toggleCatMode()"></div>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
             <h4>Daily Reminder</h4>
-            <p>Browser notification to log expenses</p>
+            <p>Notify if no expenses logged by reminder time</p>
           </div>
           <div class="toggle" id="notifToggle" onclick="toggleNotif()"></div>
+        </div>
+        <div class="toggle-wrap" id="reminderTimeRow" style="display:none">
+          <div class="toggle-info">
+            <h4>Reminder Time</h4>
+            <p>Show notification at this time daily</p>
+          </div>
+          <input type="time" class="form-input" id="reminderTimeInput"
+            style="width:110px;font-size:14px;padding:8px 10px"
+            onchange="saveReminderTime()">
         </div>
       </div>
       <div class="settings-section">
@@ -834,6 +856,10 @@ body {
         <label class="form-label">Category</label>
         <div class="chips-wrap" id="catChips"></div>
       </div>
+      <div class="form-group" id="subCatGroup" style="display:none">
+        <label class="form-label">Sub-category <span style="color:var(--ink-3);font-weight:400;font-size:10px">(optional)</span></label>
+        <div class="chips-wrap" id="subCatChips"></div>
+      </div>
       <div class="form-group">
         <label class="form-label">Payment Type</label>
         <select class="form-input form-select" id="fPayment" onchange="onPaymentChange()">
@@ -862,26 +888,36 @@ body {
   <div class="sheet" style="max-width:420px">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
-      <span class="sheet-title">New Category</span>
+      <span class="sheet-title" id="catSheetTitle">New Category</span>
       <button class="sheet-close" onclick="closeSheet('catSheet')"><span class="material-icons-round">close</span></button>
     </div>
     <div class="sheet-body">
-      <div class="form-group">
-        <label class="form-label">Emoji</label>
-        <input type="text" class="form-input" id="cEmoji" placeholder="🛒" maxlength="4" style="font-size:24px;text-align:center">
+      <div id="catSheetParentRow" style="display:none;margin-bottom:14px;padding:10px 14px;background:var(--surface-3);border-radius:var(--rsm)">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Under</div>
+        <div id="catSheetParentLabel" style="font-size:14px;font-weight:600"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Name</label>
+        <label class="form-label">Emoji</label>
+        <input type="text" class="form-input" id="cEmoji" placeholder="📦" maxlength="4"
+          style="font-size:28px;text-align:center;padding:10px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name *</label>
         <input type="text" class="form-input" id="cName" placeholder="Category name">
       </div>
       <div class="form-group">
+        <label class="form-label">Description <span style="color:var(--ink-3);font-weight:400">(shown to help classify)</span></label>
+        <input type="text" class="form-input" id="cDesc" placeholder="What goes here? e.g. Doctor visits, OPD fees">
+      </div>
+      <div id="cColorRow" class="form-group">
         <label class="form-label">Color</label>
-        <input type="color" class="form-input" id="cColor" value="#1a73e8" style="height:48px;padding:6px;cursor:pointer">
+        <input type="color" class="form-input" id="cColor" value="#1a73e8"
+          style="height:48px;padding:6px;cursor:pointer">
       </div>
     </div>
     <div class="sheet-footer">
       <button class="btn btn-ghost" onclick="closeSheet('catSheet')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveCat()">Add Category</button>
+      <button class="btn btn-primary" onclick="saveCat()" id="saveCatBtn">Add</button>
     </div>
   </div>
 </div>
@@ -926,6 +962,10 @@ body {
       <div class="form-group">
         <label class="form-label">Category</label>
         <div class="chips-wrap" id="smsCatChips"></div>
+      </div>
+      <div class="form-group" id="smsSubCatGroup" style="display:none">
+        <label class="form-label">Sub-category <span style="color:var(--ink-3);font-weight:400;font-size:10px">(optional)</span></label>
+        <div class="chips-wrap" id="smsSubCatChips"></div>
       </div>
       <div class="form-group">
         <label class="form-label">
@@ -997,31 +1037,131 @@ body {
 const S = {
   expenses: [],
   categories: [],
+  customSubs: {},      // {parentId: [{id, name, emoji, desc}]} — user-added subs
   cards: [],
-  smsQueue: [],        // persisted review queue: {id, raw, parsed:{...}, status:'pending'}
-  settings: { currency: 'INR', notif: false },
+  smsQueue: [],
+  settings: { currency: 'INR', notif: false, categoryMode: 'simple' },
   month: new Date().getMonth(),
   year:  new Date().getFullYear(),
   editId: null,
   filterCat: '',
-  activeSmsId: null    // which queue item is open in confirm sheet
+  activeSmsId: null
 };
 
 const CUR = { INR:'₹', USD:'$', EUR:'€', GBP:'£', JPY:'¥', AUD:'A$', CAD:'C$', SGD:'S$', AED:'د.إ' };
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const FMONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DEFAULT_CATS = [
-  {id:'food',name:'Food & Dining',emoji:'🍽️',color:'#e53935'},
-  {id:'transport',name:'Transport',emoji:'🚗',color:'#1e88e5'},
-  {id:'shopping',name:'Shopping',emoji:'🛍️',color:'#8e24aa'},
-  {id:'bills',name:'Bills & Utilities',emoji:'💡',color:'#fb8c00'},
-  {id:'health',name:'Health',emoji:'🏥',color:'#43a047'},
-  {id:'entertainment',name:'Entertainment',emoji:'🎬',color:'#e91e63'},
-  {id:'education',name:'Education',emoji:'📚',color:'#00897b'},
-  {id:'personal',name:'Personal Care',emoji:'🧴',color:'#f4511e'},
-  {id:'savings',name:'Savings',emoji:'💰',color:'#f9ab00'},
-  {id:'other',name:'Other',emoji:'📦',color:'#607d8b'},
+  {id:'food',          name:'Food & Dining',      emoji:'🍽️', color:'#e53935'},
+  {id:'transport',     name:'Transport',           emoji:'🚗', color:'#1e88e5'},
+  {id:'shopping',      name:'Shopping',            emoji:'🛍️', color:'#8e24aa'},
+  {id:'bills',         name:'Bills & Utilities',   emoji:'💡', color:'#fb8c00'},
+  {id:'medical',       name:'Medical & Health',    emoji:'🏥', color:'#43a047'},
+  {id:'fitness',       name:'Fitness',             emoji:'💪', color:'#00acc1'},
+  {id:'travel',        name:'Travel & Vacation',   emoji:'🏖️', color:'#1565c0'},
+  {id:'entertainment', name:'Entertainment',       emoji:'🎬', color:'#e91e63'},
+  {id:'education',     name:'Education',           emoji:'📚', color:'#00897b'},
+  {id:'personal',      name:'Personal Care',       emoji:'🧴', color:'#f4511e'},
+  {id:'home',          name:'Home & Maintenance',  emoji:'🏠', color:'#6d4c41'},
+  {id:'gifts',         name:'Gifts & Donations',   emoji:'🎁', color:'#d81b60'},
+  {id:'savings',       name:'Savings',             emoji:'💰', color:'#f9ab00'},
+  {id:'other',         name:'Other',               emoji:'📦', color:'#607d8b'},
 ];
+
+// Sub-categories keyed by parent category id
+// Each: {id, name, emoji}  — inherits parent color
+// id format: parentId_subId  e.g. food_groceries
+const DEFAULT_SUBS = {
+  food: [
+    {id:'food_groceries',  name:'Groceries',        emoji:'🛒', desc:'Supermarket, kirana store, vegetables'},
+    {id:'food_restaurant', name:'Restaurant',        emoji:'🍴', desc:'Sit-down meals, fine dining'},
+    {id:'food_delivery',   name:'Food Delivery',     emoji:'🛵', desc:'Swiggy, Zomato, online orders'},
+    {id:'food_cafe',       name:'Coffee & Cafes',    emoji:'☕', desc:'Coffee shops, tea, quick bites'},
+    {id:'food_drinks',     name:'Drinks & Nightlife',emoji:'🍺', desc:'Alcohol, bar tabs, liquor store'},
+  ],
+  transport: [
+    {id:'transport_cab',     name:'Cab & Auto',         emoji:'🚕', desc:'Uber, Ola, Rapido, auto rickshaw'},
+    {id:'transport_public',  name:'Public Transport',   emoji:'🚇', desc:'Metro, bus, local train'},
+    {id:'transport_fuel',    name:'Fuel',               emoji:'⛽', desc:'Petrol, diesel, CNG'},
+    {id:'transport_parking', name:'Parking & Tolls',    emoji:'🅿️', desc:'Parking fees, highway tolls'},
+    {id:'transport_vehicle', name:'Vehicle Maintenance',emoji:'🔧', desc:'Service, repairs, tyres, insurance'},
+  ],
+  shopping: [
+    {id:'shopping_clothing',     name:'Clothing & Accessories', emoji:'👗', desc:'Clothes, shoes, bags, jewellery'},
+    {id:'shopping_electronics',  name:'Electronics & Gadgets',  emoji:'📱', desc:'Phone, laptop, earphones, accessories'},
+    {id:'shopping_home',         name:'Home & Kitchen',         emoji:'🏡', desc:'Appliances, utensils, décor'},
+    {id:'shopping_books',        name:'Books & Media',          emoji:'📖', desc:'Physical books, magazines, newspapers'},
+    {id:'shopping_general',      name:'General / Online',       emoji:'📦', desc:'Amazon, Flipkart misc, hard to classify'},
+  ],
+  bills: [
+    {id:'bills_electricity', name:'Electricity',          emoji:'⚡', desc:'EB bill, power charges'},
+    {id:'bills_water',       name:'Water',                emoji:'💧', desc:'Water board bill, water cans'},
+    {id:'bills_gas',         name:'Gas & LPG',            emoji:'🔥', desc:'Cylinder booking, piped gas'},
+    {id:'bills_internet',    name:'Internet & Broadband', emoji:'📡', desc:'Home WiFi, broadband plan'},
+    {id:'bills_mobile',      name:'Mobile Recharge',      emoji:'📲', desc:'Prepaid recharge, postpaid bill'},
+    {id:'bills_rent',        name:'Rent',                 emoji:'🏘️', desc:'Monthly house or office rent'},
+    {id:'bills_society',     name:'Society Maintenance',  emoji:'🏢', desc:'Apartment maintenance charges'},
+    {id:'bills_insurance',   name:'Home Insurance',       emoji:'🛡️', desc:'Property, contents insurance'},
+    {id:'bills_emi',         name:'Loan EMI',             emoji:'🏦', desc:'Home loan, car loan, personal loan EMI'},
+  ],
+  medical: [
+    {id:'medical_doctor',  name:'Doctor Consultation', emoji:'👨‍⚕️', desc:'OPD visit, GP, specialist fee'},
+    {id:'medical_pharmacy',name:'Pharmacy',            emoji:'💊', desc:'Medicines, supplements, OTC drugs'},
+    {id:'medical_lab',     name:'Lab & Diagnostics',   emoji:'🔬', desc:'Blood tests, scans, MRI, X-rays'},
+    {id:'medical_dental',  name:'Dental',              emoji:'🦷', desc:'Dentist visits, braces, procedures'},
+    {id:'medical_vision',  name:'Vision',              emoji:'👓', desc:'Glasses, contacts, eye checkup'},
+    {id:'medical_hospital',name:'Hospital & Surgery',  emoji:'🏥', desc:'Admission, emergency, procedures'},
+    {id:'medical_mental',  name:'Mental Health',       emoji:'🧠', desc:'Therapy, counselling, psychiatrist'},
+  ],
+  fitness: [
+    {id:'fitness_gym',          name:'Gym & Classes',         emoji:'🏋️', desc:'Gym membership, yoga, swimming, CrossFit'},
+    {id:'fitness_sports',       name:'Sports & Recreation',   emoji:'⚽', desc:'Court bookings, equipment rental, games'},
+    {id:'fitness_supplements',  name:'Supplements & Nutrition',emoji:'🥤', desc:'Protein, vitamins, health drinks'},
+    {id:'fitness_equipment',    name:'Sports Equipment',      emoji:'🎽', desc:'Gear, shoes, sportswear'},
+  ],
+  travel: [
+    {id:'travel_transport',      name:'Transportation',        emoji:'✈️', desc:'Flights, trains, buses — getting there'},
+    {id:'travel_stay',           name:'Accommodation',         emoji:'🏨', desc:'Hotels, Airbnb, OYO, hostels'},
+    {id:'travel_activities',     name:'Activities & Experiences',emoji:'🗺️', desc:'Sightseeing, tours, entry tickets, adventures'},
+    {id:'travel_essentials',     name:'Travel Essentials',     emoji:'🗂️', desc:'Visa, travel insurance, forex, documents'},
+    {id:'travel_misc',           name:'Miscellaneous',         emoji:'🧳', desc:'Anything else travel-related'},
+  ],
+  entertainment: [
+    {id:'entertainment_streaming',name:'Streaming Services',   emoji:'📺', desc:'Netflix, Prime, Hotstar, Spotify, YouTube Premium'},
+    {id:'entertainment_movies',   name:'Movies & Events',      emoji:'🎥', desc:'BookMyShow, PVR, concerts, theatre, shows'},
+    {id:'entertainment_gaming',   name:'Gaming',               emoji:'🎮', desc:'Steam, mobile games, console games, in-app purchases'},
+    {id:'entertainment_sports',   name:'Sports & Live Events', emoji:'🏟️', desc:'Match tickets, IPL, sporting events'},
+    {id:'entertainment_hobbies',  name:'Hobbies',              emoji:'🎨', desc:'Photography, art, instruments, crafts, collectibles'},
+  ],
+  education: [
+    {id:'education_fees',     name:'School / College Fees', emoji:'🎓', desc:'Tuition fees, admission, exam fees'},
+    {id:'education_courses',  name:'Online Courses',        emoji:'💻', desc:'Udemy, Coursera, Byju\'s, Unacademy'},
+    {id:'education_books',    name:'Books & Stationery',    emoji:'✏️', desc:'Textbooks, notebooks, pens, supplies'},
+    {id:'education_coaching', name:'Coaching & Tuition',    emoji:'📝', desc:'Private tuition, coaching centres'},
+  ],
+  personal: [
+    {id:'personal_salon',    name:'Salon & Grooming',   emoji:'💇', desc:'Haircut, shaving, barbershop, threading'},
+    {id:'personal_skincare', name:'Skincare & Cosmetics',emoji:'💄', desc:'Skincare products, makeup, perfume'},
+    {id:'personal_wellness', name:'Spa & Wellness',     emoji:'🧖', desc:'Massage, spa, wellness centres'},
+  ],
+  home: [
+    {id:'home_repairs',     name:'Repairs & Maintenance', emoji:'🔨', desc:'Plumber, electrician, carpenter, painter'},
+    {id:'home_furniture',   name:'Furniture & Decor',     emoji:'🛋️', desc:'Buying furniture, home décor, curtains'},
+    {id:'home_domestic',    name:'Maid & Domestic Help',  emoji:'🧹', desc:'Cook, cleaning staff, driver salary'},
+    {id:'home_appliances',  name:'Appliances',            emoji:'🫙', desc:'Washing machine, fridge, AC, microwave'},
+  ],
+  gifts: [
+    {id:'gifts_personal',  name:'Gifts',                emoji:'🎁', desc:'Birthday, anniversary, wedding gifts'},
+    {id:'gifts_charity',   name:'Charity & Donations',  emoji:'🙏', desc:'NGO, temple, church, crowdfunding, relief'},
+  ],
+  savings: [
+    {id:'savings_mutual',    name:'Mutual Funds',    emoji:'📈', desc:'SIP, lump sum fund investments'},
+    {id:'savings_fd',        name:'Fixed Deposit',   emoji:'🏦', desc:'Bank FD, recurring deposits'},
+    {id:'savings_emergency', name:'Emergency Fund',  emoji:'🔐', desc:'Safety net savings'},
+    {id:'savings_cash',      name:'Cash Savings',    emoji:'💵', desc:'Physical cash savings, piggy bank'},
+  ],
+};
+// No subs for: transport (has own), other
 const PAYMENT_TYPES = ['UPI','Cash','Credit Card','Debit Card','Net Banking','Other'];
 
 // ── PERSIST ────────────────────────────────────
@@ -1031,18 +1171,53 @@ function load() {
     if (d) {
       S.expenses   = d.expenses   || [];
       S.categories = d.categories || DEFAULT_CATS;
+      S.customSubs = d.customSubs || {};
       S.cards      = d.cards      || [];
       S.smsQueue   = d.smsQueue   || [];
       S.settings   = { ...S.settings, ...d.settings };
+
+      // ── Migration: rename old 'health' → 'medical' ──
+      S.expenses.forEach(e => { if(e.category==='health') e.category='medical'; });
+      const hIdx = S.categories.findIndex(c=>c.id==='health');
+      if(hIdx>-1) {
+        S.categories[hIdx].id='medical';
+        S.categories[hIdx].name='Medical & Health';
+        S.categories[hIdx].emoji='🏥';
+      }
+
+      // Build savedIds AFTER rename so we don't get duplicates
+      const savedIds = new Set(S.categories.map(c=>c.id));
+
+      // Add any new default categories not yet in saved list
+      let migrated = false;
+      DEFAULT_CATS.forEach(dc => {
+        if(!savedIds.has(dc.id)) { S.categories.push({...dc}); migrated=true; }
+      });
+
+      // Persist immediately if anything was migrated
+      if(migrated || hIdx>-1) persist();
+
     } else { S.categories = [...DEFAULT_CATS]; }
   } catch { S.categories = [...DEFAULT_CATS]; }
 }
 function persist() {
   localStorage.setItem('sw2', JSON.stringify({
     expenses: S.expenses, categories: S.categories,
-    cards: S.cards, smsQueue: S.smsQueue, settings: S.settings
+    customSubs: S.customSubs, cards: S.cards,
+    smsQueue: S.smsQueue, settings: S.settings
   }));
 }
+
+// ── SUB-CATEGORY HELPERS ───────────────────────
+// Get all subs for a parent (default + custom)
+// Get a single sub by id (searches all parents)
+function getSub(subId) {
+  if (!subId) return null;
+  const parentId = subId.split('_')[0];
+  return getSubs(parentId).find(s=>s.id===subId) || null;
+}
+// Is detailed mode on?
+function isDetailed() { return S.settings.categoryMode === 'detailed'; }
 
 // ── HELPERS ────────────────────────────────────
 function fmt(n) { return (CUR[S.settings.currency]||'₹') + Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -1244,13 +1419,15 @@ function setCatFilter(id) { S.filterCat=id; renderList(); }
 
 function expItem(e, actions=false) {
   const c=cat(e.category);
+  const sub = e.subcategory ? getSub(e.subcategory) : null;
   const cardInfo = (e.paymentType==='Credit Card' && e.cardId) ? getCard(e.cardId) : null;
   const payLabel = cardInfo ? `${e.paymentType} · ${cardInfo.name}${cardInfo.last4?' ••'+cardInfo.last4:''}` : e.paymentType;
+  const catLabel = sub ? `${c.name} › ${sub.emoji} ${sub.name}` : c.name;
   return `<div class="exp-item" id="ei-${e.id}">
-    <div class="exp-icon" style="background:rgba(${rgb(c.color)},.13)">${c.emoji}</div>
+    <div class="exp-icon" style="background:rgba(${rgb(c.color)},.13)">${sub?sub.emoji:c.emoji}</div>
     <div class="exp-info">
       <div class="exp-name">${e.description}</div>
-      <div class="exp-meta">${c.name} · ${payLabel}${e.notes?' · '+e.notes:''}</div>
+      <div class="exp-meta">${catLabel} · ${payLabel}${e.notes?' · '+e.notes:''}</div>
     </div>
     <div class="exp-right">
       <div class="exp-amt">${fmt(e.amount)}</div>
@@ -1263,334 +1440,808 @@ function expItem(e, actions=false) {
 }
 
 // ── ANALYTICS ──────────────────────────────────
+let _analyticsCatView = 'main';
+let _analyticsSubParent = null;
+let _habitsMetric = 'amount';
+let _monthlyView = 'trend';      // 'trend' | 'compare'
+let _compareMode = 'prev';       // 'prev' = vs last month | 'year' = vs same month last year
+
 function switchAnalytics(tab, el) {
   document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
+  _analyticsCatView = 'main';
+  if (tab==='payment') { renderAnalyticsPayment(); return; }
   renderAnalytics(tab);
 }
 
-function pctBadge(pct, color='var(--primary)') {
-  return `<span style="display:inline-block;min-width:42px;text-align:right;font-size:12px;font-weight:700;font-family:'DM Mono',monospace;color:${color}">${pct}%</span>`;
+// ── Shared segmented control builder ──
+function segControl(options, activeVal, onclickFn) {
+  return `<div style="display:flex;background:var(--surface-3);border-radius:20px;padding:3px;gap:2px;margin-bottom:14px">
+    ${options.map(([val,label])=>`
+      <button onclick="${onclickFn}('${val}')"
+        style="flex:1;padding:6px 0;border:none;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;
+        background:${activeVal===val?'var(--surface)':'transparent'};
+        color:${activeVal===val?'var(--primary)':'var(--ink-3)'};
+        box-shadow:${activeVal===val?'var(--sh1)':'none'};transition:all .15s">
+        ${label}
+      </button>`).join('')}
+  </div>`;
 }
+
+// ── Shared bar row builder ──
+function barRow(label, amt, total, barMax, color, extraRight='') {
+  const utilPct = total ? (amt/total*100).toFixed(1) : '0.0';
+  const barPct  = (amt/barMax*100).toFixed(1);
+  return `<div class="bar-row">
+    <div class="bar-lbl">${label}</div>
+    <div class="bar-track">
+      <div class="bar-fill" style="width:${barPct}%;background:${color}">
+        ${barPct>22?`<span>${utilPct}%</span>`:''}
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
+      <div class="bar-amt" style="margin:0">${fmt(amt)}</div>
+      <div style="font-size:11px;font-weight:700;color:${color};font-family:'DM Mono',monospace">${utilPct}%</div>
+      ${extraRight}
+    </div>
+  </div>`;
+}
+
+// ── Category view toggle ──
+function catViewToggle() {
+  return segControl([['main','Main Categories'],['sub','Sub-categories']], _analyticsCatView, 'setCatView');
+}
+function setCatView(v) { _analyticsCatView=v; renderAnalytics('category'); }
+function setSubParent(id) { _analyticsSubParent=id; renderAnalytics('category'); }
+function setMonthlyView(v) { _monthlyView=v; renderAnalytics('monthly'); }
+function setCompareMode(v) { _compareMode=v; renderAnalytics('monthly'); }
 
 function renderAnalytics(tab) {
   const el = document.getElementById('analyticsBody');
 
+  // ── MONTHLY ─────────────────────────────────────
   if (tab==='monthly') {
-    const rows = [];
-    for (let i=5;i>=0;i--) {
-      let m=S.month-i, y=S.year; if(m<0){m+=12;y--;}
-      const exps=moExp(m,y);
-      const tot=exps.reduce((s,e)=>s+e.amount,0);
-      rows.push({label:MONTHS[m]+' '+y, total:tot, count:exps.length, m, y});
-    }
-    const grandTotal = rows.reduce((s,r)=>s+r.total,0);
-    const mx = Math.max(...rows.map(r=>r.total),1);
-    const avg6 = grandTotal / 6;
-    const curRow = rows[rows.length-1];
-    const vsAvg = avg6 ? ((curRow.total-avg6)/avg6*100).toFixed(1) : null;
 
-    el.innerHTML=`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <div class="stat-card" style="--accent:var(--primary)">
-          <div class="stat-label">6-Month Total</div>
-          <div class="stat-val" style="font-size:18px">${fmt(grandTotal)}</div>
-          <div class="stat-sub">${rows.filter(r=>r.total>0).length} active months</div>
+    const toggle = segControl(
+      [['trend','📈 Trend'],['compare','🔄 Compare']],
+      _monthlyView, 'setMonthlyView'
+    );
+
+    // ── TREND VIEW ──
+    if (_monthlyView === 'trend') {
+      const rows = [];
+      for (let i=5;i>=0;i--) {
+        let m=S.month-i, y=S.year; if(m<0){m+=12;y--;}
+        const exps=moExp(m,y);
+        const tot=exps.reduce((s,e)=>s+e.amount,0);
+        rows.push({label:MONTHS[m]+' '+y, total:tot, count:exps.length, m, y});
+      }
+      const grandTotal = rows.reduce((s,r)=>s+r.total,0);
+      const mx  = Math.max(...rows.map(r=>r.total),1);
+      const avg6 = grandTotal/6;
+      const curRow = rows[rows.length-1];
+      const vsAvg = avg6 ? ((curRow.total-avg6)/avg6*100).toFixed(1) : null;
+
+      el.innerHTML=`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div class="stat-card" style="--accent:var(--primary)">
+            <div class="stat-label">6-Month Total</div>
+            <div class="stat-val" style="font-size:18px">${fmt(grandTotal)}</div>
+            <div class="stat-sub">${rows.filter(r=>r.total>0).length} active months</div>
+          </div>
+          <div class="stat-card" style="--accent:var(--yellow)">
+            <div class="stat-label">Monthly Avg</div>
+            <div class="stat-val" style="font-size:18px">${fmt(avg6)}</div>
+            <div class="stat-sub">${vsAvg!==null?(vsAvg>0?'▲ '+vsAvg+'% this month':'▼ '+Math.abs(vsAvg)+'% this month'):'No comparison'}</div>
+          </div>
         </div>
-        <div class="stat-card" style="--accent:var(--yellow)">
-          <div class="stat-label">Monthly Avg</div>
-          <div class="stat-val" style="font-size:18px">${fmt(avg6)}</div>
-          <div class="stat-sub">${vsAvg!==null?(vsAvg>0?'▲ '+vsAvg+'% this month':'▼ '+Math.abs(vsAvg)+'% this month'):'No comparison'}</div>
-        </div>
-      </div>
-      <div class="card"><div class="card-head">
-        <span class="card-title">6-Month Spending</span>
-        <span style="font-size:11px;color:var(--ink-3)">% of period total</span>
-      </div><div class="card-body"><div class="bar-list">${
-        rows.map(r=>{
-          const barPct = (r.total/mx*100).toFixed(1);
-          const utilPct = grandTotal ? (r.total/grandTotal*100).toFixed(1) : '0.0';
-          const isCur = r.m===S.month && r.y===S.year;
-          return `<div class="bar-row">
-            <div class="bar-lbl" style="font-weight:${isCur?700:400};color:${isCur?'var(--primary)':'var(--ink-2)'}">${r.label}</div>
-            <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${isCur?'var(--primary)':'#c5cae9'}">
-              ${barPct>20?`<span>${utilPct}%</span>`:''}
-            </div></div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
-              <div class="bar-amt" style="margin:0">${fmt(r.total)}</div>
-              <div style="font-size:11px;font-weight:700;color:${isCur?'var(--primary)':'var(--ink-3)'};font-family:'DM Mono',monospace">${utilPct}%</div>
+        ${toggle}
+        <div class="card"><div class="card-head">
+          <span class="card-title">6-Month Spending</span>
+          <span style="font-size:11px;color:var(--ink-3)">% of period total</span>
+        </div><div class="card-body"><div class="bar-list">${
+          rows.map(r=>{
+            const isCur = r.m===S.month && r.y===S.year;
+            return barRow(
+              `<span style="font-weight:${isCur?700:400};color:${isCur?'var(--primary)':'var(--ink-2)'}">${r.label}</span>`,
+              r.total, grandTotal, mx, isCur?'var(--primary)':'#c5cae9'
+            );
+          }).join('')
+        }</div></div></div>`;
+
+    // ── COMPARE VIEW ──
+    } else {
+      // Determine periods
+      let bm, by; // "base" = what we compare against
+      if (_compareMode === 'prev') {
+        bm = S.month-1; by = S.year;
+        if (bm<0) { bm=11; by--; }
+      } else {
+        bm = S.month; by = S.year-1;
+      }
+
+      const curExps  = moExp(S.month, S.year);
+      const baseExps = moExp(bm, by);
+      const curTotal  = curExps.reduce((s,e)=>s+e.amount,0);
+      const baseTotal = baseExps.reduce((s,e)=>s+e.amount,0);
+      const totalDiff = curTotal - baseTotal;
+      const totalDiffPct = baseTotal ? (totalDiff/baseTotal*100).toFixed(1) : null;
+      const isUp = totalDiff > 0;
+
+      // Per-category comparison
+      const allCatIds = new Set([
+        ...curExps.map(e=>e.category),
+        ...baseExps.map(e=>e.category)
+      ]);
+      const catRows = [];
+      allCatIds.forEach(id=>{
+        const curAmt  = curExps.filter(e=>e.category===id).reduce((s,e)=>s+e.amount,0);
+        const baseAmt = baseExps.filter(e=>e.category===id).reduce((s,e)=>s+e.amount,0);
+        if (curAmt===0 && baseAmt===0) return;
+        const diff    = curAmt - baseAmt;
+        const diffPct = baseAmt ? (diff/baseAmt*100).toFixed(0) : null;
+        catRows.push({id, curAmt, baseAmt, diff, diffPct});
+      });
+      catRows.sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
+
+      const curLabel  = MONTHS[S.month]+' '+S.year;
+      const baseLabel = MONTHS[bm]+' '+by;
+      const barMax    = Math.max(...catRows.map(r=>Math.max(r.curAmt,r.baseAmt)),1);
+
+      const compareToggle = segControl(
+        [['prev','vs Last Month'],['year','vs Last Year']],
+        _compareMode, 'setCompareMode'
+      );
+
+      // Summary delta card
+      const deltaColor = isUp ? 'var(--red)' : 'var(--green)';
+      const deltaIcon  = isUp ? '▲' : '▼';
+
+      el.innerHTML=`
+        <!-- Top summary -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div class="stat-card" style="--accent:var(--primary)">
+            <div class="stat-label">${curLabel}</div>
+            <div class="stat-val" style="font-size:18px">${fmt(curTotal)}</div>
+            <div class="stat-sub">${curExps.length} transactions</div>
+          </div>
+          <div class="stat-card" style="--accent:${deltaColor}">
+            <div class="stat-label">${baseLabel}</div>
+            <div class="stat-val" style="font-size:18px">${fmt(baseTotal)}</div>
+            <div class="stat-sub" style="color:${deltaColor};font-weight:600">
+              ${totalDiffPct!==null ? deltaIcon+' '+Math.abs(totalDiffPct)+'% difference' : baseTotal===0?'No data last period':''}
             </div>
-          </div>`;
-        }).join('')
-      }</div></div></div>`;
+          </div>
+        </div>
+        ${toggle}
+        ${compareToggle}
 
+        <!-- Overall delta banner -->
+        ${curTotal>0||baseTotal>0 ? `
+        <div style="background:${isUp?'#fce8e6':'#e8f5e9'};border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:24px">${isUp?'📈':'📉'}</span>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:${deltaColor}">
+              ${isUp?'Spending up':'Spending down'} ${totalDiffPct!==null?Math.abs(totalDiffPct)+'%':''}
+            </div>
+            <div style="font-size:12px;color:var(--ink-2);margin-top:2px">
+              ${fmt(Math.abs(totalDiff))} ${isUp?'more':'less'} than ${baseLabel}
+            </div>
+          </div>
+        </div>` : ''}
+
+        <!-- Per-category comparison -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">By Category</span>
+            <div style="display:flex;align-items:center;gap:10px;font-size:11px;color:var(--ink-3)">
+              <span style="display:flex;align-items:center;gap:4px">
+                <span style="width:10px;height:10px;border-radius:2px;background:var(--primary);display:inline-block"></span>${curLabel}
+              </span>
+              <span style="display:flex;align-items:center;gap:4px">
+                <span style="width:10px;height:10px;border-radius:2px;background:#c5cae9;display:inline-block"></span>${baseLabel}
+              </span>
+            </div>
+          </div>
+          <div class="card-body">
+            ${catRows.length ? catRows.map(r=>{
+              const c = cat(r.id);
+              const curBarW  = (r.curAmt/barMax*100).toFixed(1);
+              const baseBarW = (r.baseAmt/barMax*100).toFixed(1);
+              const diffColor = r.diff>0?'var(--red)':r.diff<0?'var(--green)':'var(--ink-3)';
+              const diffLabel = r.diff===0 ? '—'
+                : (r.diff>0?'▲ ':'▼ ')+fmt(Math.abs(r.diff))
+                  +(r.diffPct!==null?' ('+Math.abs(r.diffPct)+'%)':'');
+              return `<div style="margin-bottom:14px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                  <span style="font-size:13px;font-weight:500">${c.emoji} ${c.name}</span>
+                  <span style="font-size:12px;font-weight:700;color:${diffColor}">${diffLabel}</span>
+                </div>
+                <!-- Current month bar -->
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+                  <span style="font-size:10px;color:var(--ink-3);width:28px;text-align:right;flex-shrink:0">${curLabel.split(' ')[0]}</span>
+                  <div style="flex:1;height:16px;background:var(--surface-3);border-radius:8px;overflow:hidden">
+                    <div style="height:100%;width:${curBarW}%;background:${c.color};border-radius:8px;transition:width .5s"></div>
+                  </div>
+                  <span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;width:70px;text-align:right;flex-shrink:0">${fmt(r.curAmt)}</span>
+                </div>
+                <!-- Base month bar -->
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:10px;color:var(--ink-3);width:28px;text-align:right;flex-shrink:0">${baseLabel.split(' ')[0]}</span>
+                  <div style="flex:1;height:16px;background:var(--surface-3);border-radius:8px;overflow:hidden">
+                    <div style="height:100%;width:${baseBarW}%;background:#c5cae9;border-radius:8px;transition:width .5s"></div>
+                  </div>
+                  <span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;width:70px;text-align:right;color:var(--ink-3);flex-shrink:0">${fmt(r.baseAmt)}</span>
+                </div>
+              </div>`;
+            }).join('')
+            : '<div class="empty"><span class="material-icons-round">compare_arrows</span><p>No data to compare</p></div>'}
+          </div>
+        </div>`;
+    }
+
+  // ── CATEGORY ────────────────────────────────────
   } else if (tab==='category') {
-    const exps=moExp(S.month,S.year);
-    const cm={};exps.forEach(e=>{cm[e.category]=(cm[e.category]||0)+e.amount;});
-    const sorted=Object.entries(cm).sort((a,b)=>b[1]-a[1]);
-    const total=sorted.reduce((s,[,v])=>s+v,0);
-    const mx=sorted[0]?.[1]||1;
-    const topEntry = sorted[0];
-    const topC = topEntry ? cat(topEntry[0]) : null;
+    const exps  = moExp(S.month,S.year);
+    const total = exps.reduce((s,e)=>s+e.amount,0);
 
-    el.innerHTML=`
+    // ── Stat cards (shared) ──
+    const cm={};
+    exps.forEach(e=>{cm[e.category]=(cm[e.category]||0)+e.amount;});
+    const sortedMains = Object.entries(cm).sort((a,b)=>b[1]-a[1]);
+    const topEntry    = sortedMains[0];
+    const topC        = topEntry ? cat(topEntry[0]) : null;
+
+    // Top sub (detailed mode only)
+    let topSubEntry=null, topSubC=null;
+    if (isDetailed()) {
+      const sm={};
+      exps.filter(e=>e.subcategory).forEach(e=>{sm[e.subcategory]=(sm[e.subcategory]||0)+e.amount;});
+      const sortedSubs=Object.entries(sm).sort((a,b)=>b[1]-a[1]);
+      if (sortedSubs[0]) { topSubEntry=sortedSubs[0]; topSubC=getSub(topSubEntry[0]); }
+    }
+
+    const statsHtml=`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div class="stat-card" style="--accent:var(--primary)">
           <div class="stat-label">Categories Used</div>
-          <div class="stat-val">${sorted.length}</div>
+          <div class="stat-val">${sortedMains.length}</div>
           <div class="stat-sub">of ${S.categories.length} total</div>
         </div>
         <div class="stat-card" style="--accent:var(--red)">
-          <div class="stat-label">Biggest Spend</div>
-          <div class="stat-val" style="font-size:15px;margin-top:4px">${topC?topC.emoji+' '+topC.name.split(' ')[0]:'—'}</div>
-          <div class="stat-sub">${topEntry?(total?(topEntry[1]/total*100).toFixed(1)+'% of total':''):'No data'}</div>
+          <div class="stat-label">${isDetailed()&&topSubC?'Top Sub':'Biggest Spend'}</div>
+          <div class="stat-val" style="font-size:14px;margin-top:3px">${
+            isDetailed()&&topSubC
+              ? topSubC.emoji+' '+topSubC.name
+              : topC?topC.emoji+' '+topC.name.split(' ')[0]:'—'
+          }</div>
+          <div class="stat-sub">${
+            isDetailed()&&topSubEntry&&total
+              ? (topSubEntry[1]/total*100).toFixed(1)+'% of month'
+              : topEntry&&total?(topEntry[1]/total*100).toFixed(1)+'% of month':''
+          }</div>
+        </div>
+      </div>`;
+
+    // ── MAIN CATEGORIES VIEW ──
+    if (!isDetailed() || _analyticsCatView==='main') {
+      const mx = sortedMains[0]?.[1]||1;
+      el.innerHTML = statsHtml
+        + (isDetailed() ? catViewToggle() : '')
+        + `<div class="card"><div class="card-head">
+            <span class="card-title">Main Categories · ${MONTHS[S.month]}</span>
+            <span style="font-size:11px;color:var(--ink-3)">% of month total</span>
+          </div><div class="card-body">${
+            sortedMains.length
+              ? `<div class="bar-list">${sortedMains.map(([id,amt])=>{
+                  const c=cat(id);
+                  // show sub-count hint in detailed mode
+                  const subCount = isDetailed()
+                    ? exps.filter(e=>e.category===id&&e.subcategory).length : 0;
+                  const subHint = isDetailed()&&subCount>0
+                    ? `<div style="font-size:10px;color:var(--ink-3);cursor:pointer"
+                        onclick="setSubParent('${id}');setCatView('sub')"
+                        title="View subs">${subCount} sub${subCount!==1?'s':''} ›</div>` : '';
+                  return barRow(`${c.emoji} ${c.name}`, amt, total, mx, c.color, subHint);
+                }).join('')}</div>`
+              : '<div class="empty"><span class="material-icons-round">bar_chart</span><p>No data</p></div>'
+          }</div></div>`;
+
+    // ── SUB-CATEGORIES DRILL-DOWN VIEW (detailed mode only) ──
+    } else {
+      // Build list of parents that have spend this month
+      const parentsWithSpend = S.categories.filter(c=>cm[c.id]>0);
+
+      // Auto-select first parent if none selected or selected has no spend
+      if (!_analyticsSubParent || !cm[_analyticsSubParent]) {
+        _analyticsSubParent = parentsWithSpend[0]?.id || null;
+      }
+
+      // Parent picker — scrollable chip row
+      const parentPicker = `<div class="filter-row" style="margin-bottom:14px">
+        ${parentsWithSpend.map(c=>`
+          <div class="filter-chip ${_analyticsSubParent===c.id?'sel':''}"
+            onclick="setSubParent('${c.id}')"
+            style="${_analyticsSubParent===c.id?'border-color:'+c.color+';color:'+c.color+';background:rgba('+rgb(c.color)+',.1)':''}">
+            ${c.emoji} ${c.name}
+          </div>`).join('')}
+      </div>`;
+
+      let subContent = '<div class="empty"><span class="material-icons-round">label_off</span><p>No sub-categories set this month</p></div>';
+
+      if (_analyticsSubParent) {
+        const parentCat    = cat(_analyticsSubParent);
+        const parentTotal  = cm[_analyticsSubParent]||0;
+        const parentExps   = exps.filter(e=>e.category===_analyticsSubParent);
+
+        // Tally subs
+        const sm={};
+        parentExps.filter(e=>e.subcategory).forEach(e=>{sm[e.subcategory]=(sm[e.subcategory]||0)+e.amount;});
+        const untagged = parentExps.filter(e=>!e.subcategory).reduce((s,e)=>s+e.amount,0);
+        const sortedSubs = Object.entries(sm).sort((a,b)=>b[1]-a[1]);
+        const subMax = Math.max(...sortedSubs.map(([,v])=>v), untagged, 1);
+        const taggedTotal = sortedSubs.reduce((s,[,v])=>s+v,0);
+
+        if (sortedSubs.length || untagged>0) {
+          // Two mini-stats: parent total vs month %, tagged vs untagged
+          const taggedPct = parentTotal ? (taggedTotal/parentTotal*100).toFixed(0) : 0;
+          subContent = `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+              <div style="background:rgba(${rgb(parentCat.color)},.08);border-radius:var(--rsm);padding:10px 12px;border-left:3px solid ${parentCat.color}">
+                <div style="font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px">Parent Total</div>
+                <div style="font-size:16px;font-weight:700;font-family:'DM Mono',monospace;color:${parentCat.color}">${fmt(parentTotal)}</div>
+                <div style="font-size:11px;color:var(--ink-3)">${total?(parentTotal/total*100).toFixed(1):'0'}% of month</div>
+              </div>
+              <div style="background:var(--surface-3);border-radius:var(--rsm);padding:10px 12px">
+                <div style="font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px">Sub-tagged</div>
+                <div style="font-size:16px;font-weight:700;font-family:'DM Mono',monospace;color:var(--ink)">${taggedPct}%</div>
+                <div style="font-size:11px;color:var(--ink-3)">${sortedSubs.length} sub${sortedSubs.length!==1?'s':''} used</div>
+              </div>
+            </div>
+            <div class="bar-list">
+              ${sortedSubs.map(([subId,amt])=>{
+                const s = getSub(subId)||{name:subId,emoji:'📦'};
+                return barRow(
+                  `${s.emoji} ${s.name}`,
+                  amt, parentTotal, subMax, parentCat.color,
+                  `<div style="font-size:10px;color:var(--ink-3)">${total?(amt/total*100).toFixed(1):0}% month</div>`
+                );
+              }).join('')}
+              ${untagged>0 ? barRow(
+                `<span style="color:var(--ink-3)">📦 Untagged</span>`,
+                untagged, parentTotal, subMax, '#b0bec5',
+                `<div style="font-size:10px;color:var(--ink-3)">${total?(untagged/total*100).toFixed(1):0}% month</div>`
+              ) : ''}
+            </div>`;
+        }
+      }
+
+      el.innerHTML = statsHtml + catViewToggle()
+        + parentPicker
+        + `<div class="card"><div class="card-head">
+            <span class="card-title">
+              ${_analyticsSubParent ? cat(_analyticsSubParent).emoji+' '+cat(_analyticsSubParent).name : 'Sub-categories'}
+            </span>
+            <span style="font-size:11px;color:var(--ink-3)">% of parent · % of month</span>
+          </div><div class="card-body">${subContent}</div></div>`;
+    }
+
+  // ── HABITS (day-of-week heatmap) ────────────────
+  } else if (tab==='habits') {
+    const exps = moExp(S.month, S.year);
+    const sym  = CUR[S.settings.currency]||'₹';
+
+    // Build per-day-of-week data — also split by week for heatmap
+    const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+    // For heatmap: get all days in the current month
+    const year = S.year, month = S.month;
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    const cells = []; // {date, dow, amount, count}
+    for (let d=1; d<=daysInMonth; d++) {
+      const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow = new Date(dateStr+'T00:00').getDay();
+      const dayExps = exps.filter(e=>e.date===dateStr);
+      cells.push({
+        date: dateStr, d, dow,
+        amount: dayExps.reduce((s,e)=>s+e.amount,0),
+        count: dayExps.length
+      });
+    }
+
+    // Aggregate by day of week for the bar summary
+    const dowAmt   = Array(7).fill(0);
+    const dowCount = Array(7).fill(0);
+    const dowDays  = Array(7).fill(0); // how many of that weekday exist in the month
+    cells.forEach(c=>{
+      dowAmt[c.dow]   += c.amount;
+      dowCount[c.dow] += c.count;
+      dowDays[c.dow]++;
+    });
+    // Average per occurrence of that weekday
+    const dowAmtAvg   = dowAmt.map((v,i)=>   dowDays[i]?v/dowDays[i]:0);
+    const dowCountAvg = dowCount.map((v,i)=> dowDays[i]?v/dowDays[i]:0);
+
+    const isAmt  = _habitsMetric==='amount';
+    const metric = isAmt ? dowAmtAvg : dowCountAvg;
+    const metricMax = Math.max(...metric, 1);
+
+    // Heatmap: group cells by week row
+    const firstDow = new Date(`${year}-${String(month+1).padStart(2,'0')}-01T00:00`).getDay();
+    const totalCells = firstDow + daysInMonth;
+    const numWeeks = Math.ceil(totalCells/7);
+
+    // Color intensity for heatmap
+    const heatMax = isAmt
+      ? Math.max(...cells.map(c=>c.amount), 1)
+      : Math.max(...cells.map(c=>c.count), 1);
+
+    function heatColor(val) {
+      if (!val) return 'var(--surface-3)';
+      const pct = val/heatMax;
+      if (pct > 0.75) return '#1a73e8';
+      if (pct > 0.5)  return '#4a90d9';
+      if (pct > 0.25) return '#7fb3e8';
+      return '#b8d4f5';
+    }
+
+    // Build calendar grid
+    let calRows = '';
+    for (let w=0; w<numWeeks; w++) {
+      let row = '<div style="display:contents">';
+      for (let d=0; d<7; d++) {
+        const cellIdx = w*7+d-firstDow+1;
+        if (cellIdx<1 || cellIdx>daysInMonth) {
+          row += `<div style="aspect-ratio:1;border-radius:6px;background:transparent"></div>`;
+        } else {
+          const cell = cells[cellIdx-1];
+          const val  = isAmt ? cell.amount : cell.count;
+          const tip  = isAmt
+            ? (val>0?fmt(val):'—')
+            : (val>0?val+' txn':'—');
+          const isToday = cell.date===new Date().toISOString().slice(0,10);
+          row += `<div title="${cell.date}: ${tip}"
+            style="aspect-ratio:1;border-radius:6px;background:${heatColor(val)};
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            border:${isToday?'2px solid var(--primary)':'2px solid transparent'};
+            cursor:default;transition:opacity .15s"
+            onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
+            <div style="font-size:10px;font-weight:600;color:${val>0?'white':'var(--ink-3)'}">${cellIdx}</div>
+            ${val>0?`<div style="font-size:8px;color:rgba(255,255,255,.85);margin-top:1px">${isAmt?sym+Math.round(val/1000)+'K':val}</div>`:''}
+          </div>`;
+        }
+      }
+      row += '</div>';
+      calRows += row;
+    }
+
+    // Top spending day
+    const topCell = [...cells].filter(c=>isAmt?c.amount>0:c.count>0).sort((a,b)=>isAmt?b.amount-a.amount:b.count-a.count)[0];
+    const topDow  = metric.indexOf(Math.max(...metric));
+    const totalTxn = cells.reduce((s,c)=>s+c.count,0);
+    const activeDays = cells.filter(c=>c.amount>0).length;
+
+    el.innerHTML=`
+      <!-- Stat cards -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="stat-card" style="--accent:var(--primary)">
+          <div class="stat-label">Active Days</div>
+          <div class="stat-val">${activeDays}</div>
+          <div class="stat-sub">of ${daysInMonth} days · ${Math.round(activeDays/daysInMonth*100)}%</div>
+        </div>
+        <div class="stat-card" style="--accent:var(--red)">
+          <div class="stat-label">Busiest ${isAmt?'Day':'Day'}</div>
+          <div class="stat-val" style="font-size:16px;margin-top:3px">${topCell?(DAYS[topCell.dow]+' '+topCell.d):'—'}</div>
+          <div class="stat-sub">${topCell?(isAmt?fmt(topCell.amount):topCell.count+' transactions'):'No data'}</div>
         </div>
       </div>
-      <div class="card"><div class="card-head">
-        <span class="card-title">Categories · ${MONTHS[S.month]}</span>
-        <span style="font-size:11px;color:var(--ink-3)">% of month total</span>
-      </div><div class="card-body">${
-        sorted.length?`<div class="bar-list">${sorted.map(([id,amt])=>{
-          const c=cat(id);
-          const utilPct=(amt/total*100).toFixed(1);
-          const barPct=(amt/mx*100).toFixed(1);
-          return`<div class="bar-row">
-            <div class="bar-lbl">${c.emoji} ${c.name}</div>
-            <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${c.color}">
-              ${barPct>20?`<span>${utilPct}%</span>`:''}
-            </div></div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
-              <div class="bar-amt" style="margin:0">${fmt(amt)}</div>
-              <div style="font-size:11px;font-weight:700;color:${c.color};font-family:'DM Mono',monospace">${utilPct}%</div>
-            </div>
-          </div>`;
-        }).join('')}</div>`:`<div class="empty"><span class="material-icons-round">bar_chart</span><p>No data</p></div>`
-      }</div></div>`;
 
-  } else if (tab==='payment') {
-    const exps=moExp(S.month,S.year);
-    const pm={};exps.forEach(e=>{pm[e.paymentType]=(pm[e.paymentType]||0)+e.amount;});
-    const sorted=Object.entries(pm).sort((a,b)=>b[1]-a[1]);
-    const total=sorted.reduce((s,[,v])=>s+v,0);
-    const mx=sorted[0]?.[1]||1;
-    const cols=['#1a73e8','#34a853','#f9ab00','#ea4335','#9c27b0','#607d8b'];
-    const topPay=sorted[0];
-    const sym=CUR[S.settings.currency]||'₹';
+      <!-- Toggle -->
+      <div style="display:flex;background:var(--surface-3);border-radius:20px;padding:3px;gap:2px;margin-bottom:14px">
+        <button onclick="setHabitsMetric('amount')"
+          style="flex:1;padding:6px 0;border:none;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;
+          background:${isAmt?'var(--surface)':'transparent'};
+          color:${isAmt?'var(--primary)':'var(--ink-3)'};
+          box-shadow:${isAmt?'var(--sh1)':'none'};transition:all .15s">
+          💰 Amount Spent
+        </button>
+        <button onclick="setHabitsMetric('count')"
+          style="flex:1;padding:6px 0;border:none;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;
+          background:${!isAmt?'var(--surface)':'transparent'};
+          color:${!isAmt?'var(--primary)':'var(--ink-3)'};
+          box-shadow:${!isAmt?'var(--sh1)':'none'};transition:all .15s">
+          🔢 Transaction Count
+        </button>
+      </div>
 
-    // credit card per-card breakdown (only if cards configured)
-    const ccExps = exps.filter(e=>e.paymentType==='Credit Card');
-    const hasCards = S.cards.length > 0;
-    let ccSection = '';
-    if(hasCards && ccExps.length>0) {
-      const cardTotals = S.cards.map(c=>{
-        const spent=ccExps.filter(e=>e.cardId===c.id).reduce((s,e)=>s+e.amount,0);
-        return {c,spent};
-      }).filter(x=>x.spent>0).sort((a,b)=>b.spent-a.spent);
-      const unassigned=ccExps.filter(e=>!e.cardId).reduce((s,e)=>s+e.amount,0);
-      const ccTotal=ccExps.reduce((s,e)=>s+e.amount,0);
-      const cardMx=Math.max(...cardTotals.map(x=>x.spent),unassigned,1);
-
-      ccSection=`<div class="card" style="margin-top:14px">
+      <!-- Calendar heatmap -->
+      <div class="card" style="margin-bottom:14px">
         <div class="card-head">
-          <span class="card-title">💳 Credit Card Breakdown</span>
-          <span style="font-size:11px;color:var(--ink-3)">${fmt(ccTotal)} total</span>
+          <span class="card-title">📅 ${FMONTHS[month]} Heatmap</span>
+          <span style="font-size:11px;color:var(--ink-3)">${isAmt?'darker = more spent':'darker = more transactions'}</span>
+        </div>
+        <div class="card-body" style="padding:12px 14px">
+          <!-- Day headers -->
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
+            ${DAYS.map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:var(--ink-3)">${d}</div>`).join('')}
+          </div>
+          <!-- Calendar grid -->
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+            ${calRows}
+          </div>
+          <!-- Legend -->
+          <div style="display:flex;align-items:center;gap:6px;margin-top:10px;justify-content:flex-end">
+            <span style="font-size:10px;color:var(--ink-3)">Less</span>
+            ${['#f1f3f4','#b8d4f5','#7fb3e8','#4a90d9','#1a73e8'].map(c=>
+              `<div style="width:14px;height:14px;border-radius:3px;background:${c}"></div>`
+            ).join('')}
+            <span style="font-size:10px;color:var(--ink-3)">More</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Day of week bar chart -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">📊 Avg by Day of Week</span>
+          <span style="font-size:11px;color:var(--ink-3)">${isAmt?'avg spend':'avg transactions'}</span>
         </div>
         <div class="card-body">
-          <div class="bar-list">${cardTotals.map(({c,spent})=>{
-            const utilPct=(spent/ccTotal*100).toFixed(1);
-            const barPct=(spent/cardMx*100).toFixed(1);
-            const limitPct=c.limit?Math.min((spent/c.limit*100),100).toFixed(1):null;
-            const limitColor=limitPct?(limitPct>=90?'var(--red)':limitPct>=70?'var(--yellow)':'var(--green)'):'';
-            return`<div style="margin-bottom:12px">
-              <div class="bar-row" style="margin-bottom:4px">
-                <div class="bar-lbl" style="display:flex;align-items:center;gap:6px">
-                  <span style="width:10px;height:10px;border-radius:50%;background:${c.color};flex-shrink:0"></span>
-                  <span style="overflow:hidden;text-overflow:ellipsis">${c.name}${c.last4?' ••'+c.last4:''}</span>
+          <div style="display:flex;align-items:flex-end;gap:6px;height:100px;margin-bottom:8px">
+            ${DAYS.map((day,i)=>{
+              const val = metric[i];
+              const h   = Math.max((val/metricMax)*88, val>0?4:2);
+              const isTop = i===topDow;
+              const isWeekend = i===0||i===6;
+              return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end">
+                <div style="font-size:9px;color:${isTop?'var(--primary)':'var(--ink-3)'};font-family:'DM Mono',monospace;font-weight:${isTop?700:400}">
+                  ${isAmt?(val>0?sym+Math.round(val/100)/10+'K':''):(val>0?val.toFixed(1):'')}
                 </div>
-                <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${c.color}">
-                  ${barPct>20?`<span>${utilPct}%</span>`:''}
-                </div></div>
-                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
-                  <div class="bar-amt" style="margin:0">${fmt(spent)}</div>
-                  <div style="font-size:11px;font-weight:700;color:${c.color};font-family:'DM Mono',monospace">${utilPct}%</div>
-                </div>
-              </div>
-              ${c.limit?`<div style="margin-left:112px;margin-right:0">
-                <div style="height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden">
-                  <div style="height:100%;width:${limitPct}%;background:${limitColor};border-radius:2px;transition:width .5s"></div>
-                </div>
-                <div style="font-size:10px;color:${limitColor};font-weight:600;margin-top:2px">${limitPct}% of ${sym}${Number(c.limit).toLocaleString('en-IN')} limit</div>
-              </div>`:''}
-            </div>`;
-          }).join('')}
-          ${unassigned>0?`<div class="bar-row">
-            <div class="bar-lbl" style="color:var(--ink-3)">Unassigned</div>
-            <div class="bar-track"><div class="bar-fill" style="width:${(unassigned/cardMx*100).toFixed(1)}%;background:#b0bec5"></div></div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
-              <div class="bar-amt" style="margin:0;color:var(--ink-3)">${fmt(unassigned)}</div>
-              <div style="font-size:11px;color:var(--ink-3);font-family:'DM Mono',monospace">${(unassigned/ccTotal*100).toFixed(1)}%</div>
-            </div>
-          </div>`:''}
+                <div style="width:100%;height:${h}px;border-radius:4px 4px 0 0;
+                  background:${isTop?'var(--primary)':isWeekend?'#ef9a9a':'#c5cae9'};
+                  transition:height .4s ease"></div>
+                <div style="font-size:10px;font-weight:${isTop?700:500};
+                  color:${isTop?'var(--primary)':isWeekend?'var(--red)':'var(--ink-3)'}">${day}</div>
+              </div>`;
+            }).join('')}
+          </div>
+          <div style="font-size:12px;color:var(--ink-2);text-align:center;padding:8px 0 0;border-top:1px solid var(--border)">
+            📌 Highest: <strong style="color:var(--primary)">${DAYS_FULL[topDow]}</strong>
+            ${isAmt
+              ? ` — avg ${sym}${Math.round(dowAmtAvg[topDow]).toLocaleString('en-IN')} per ${DAYS_FULL[topDow]}`
+              : ` — avg ${dowCountAvg[topDow].toFixed(1)} transactions per ${DAYS_FULL[topDow]}`}
           </div>
         </div>
       </div>`;
-    }
-
-    el.innerHTML=`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <div class="stat-card" style="--accent:var(--primary)">
-          <div class="stat-label">Methods Used</div>
-          <div class="stat-val">${sorted.length}</div>
-          <div class="stat-sub">This month</div>
-        </div>
-        <div class="stat-card" style="--accent:var(--green)">
-          <div class="stat-label">Most Used</div>
-          <div class="stat-val" style="font-size:15px;margin-top:4px">${topPay?topPay[0]:'—'}</div>
-          <div class="stat-sub">${topPay?(total?(topPay[1]/total*100).toFixed(1)+'% of spend':''):'No data'}</div>
-        </div>
-      </div>
-      <div class="card"><div class="card-head">
-        <span class="card-title">Payment Methods · ${MONTHS[S.month]}</span>
-        <span style="font-size:11px;color:var(--ink-3)">% of month total</span>
-      </div><div class="card-body">${
-        sorted.length?`<div class="bar-list">${sorted.map(([pay,amt],i)=>{
-          const utilPct=(amt/total*100).toFixed(1);
-          const barPct=(amt/mx*100).toFixed(1);
-          return`<div class="bar-row">
-            <div class="bar-lbl">💳 ${pay}</div>
-            <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${cols[i%cols.length]}">
-              ${barPct>20?`<span>${utilPct}%</span>`:''}
-            </div></div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;min-width:80px">
-              <div class="bar-amt" style="margin:0">${fmt(amt)}</div>
-              <div style="font-size:11px;font-weight:700;color:${cols[i%cols.length]};font-family:'DM Mono',monospace">${utilPct}%</div>
-            </div>
-          </div>`;
-        }).join('')}</div>`:`<div class="empty"><span class="material-icons-round">credit_card_off</span><p>No data</p></div>`
-      }</div></div>${ccSection}`;
   }
+}
+
+function setHabitsMetric(m) { _habitsMetric=m; renderAnalytics('habits'); }
+
+function renderAnalyticsPayment() {
+  const el = document.getElementById('analyticsBody');
+  const exps=moExp(S.month,S.year);
+  const pm={};exps.forEach(e=>{pm[e.paymentType]=(pm[e.paymentType]||0)+e.amount;});
+  const sorted=Object.entries(pm).sort((a,b)=>b[1]-a[1]);
+  const total=sorted.reduce((s,[,v])=>s+v,0);
+  const mx=sorted[0]?.[1]||1;
+  const cols=['#1a73e8','#34a853','#f9ab00','#ea4335','#9c27b0','#607d8b'];
+  const topPay=sorted[0];
+  const sym=CUR[S.settings.currency]||'₹';
+
+  // credit card per-card breakdown
+  const ccExps=exps.filter(e=>e.paymentType==='Credit Card');
+  const hasCards=S.cards.length>0;
+  let ccSection='';
+  if(hasCards&&ccExps.length>0) {
+    const cardTotals=S.cards.map(c=>{
+      const spent=ccExps.filter(e=>e.cardId===c.id).reduce((s,e)=>s+e.amount,0);
+      return {c,spent};
+    }).filter(x=>x.spent>0).sort((a,b)=>b.spent-a.spent);
+    const unassigned=ccExps.filter(e=>!e.cardId).reduce((s,e)=>s+e.amount,0);
+    const ccTotal=ccExps.reduce((s,e)=>s+e.amount,0);
+    const cardMx=Math.max(...cardTotals.map(x=>x.spent),unassigned,1);
+    ccSection=`<div class="card" style="margin-top:14px">
+      <div class="card-head">
+        <span class="card-title">💳 Credit Card Breakdown</span>
+        <span style="font-size:11px;color:var(--ink-3)">${fmt(ccTotal)} total</span>
+      </div>
+      <div class="card-body"><div class="bar-list">
+        ${cardTotals.map(({c,spent})=>{
+          const limitPct=c.limit?Math.min((spent/c.limit*100),100).toFixed(1):null;
+          const limitColor=limitPct?(limitPct>=90?'var(--red)':limitPct>=70?'var(--yellow)':'var(--green)'):'';
+          return `<div style="margin-bottom:10px">
+            ${barRow(
+              `<span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:${c.color};flex-shrink:0"></span>${c.name}${c.last4?' ••'+c.last4:''}</span>`,
+              spent,ccTotal,cardMx,c.color
+            )}
+            ${c.limit?`<div style="margin:2px 0 0 112px">
+              <div style="height:3px;background:var(--surface-3);border-radius:2px;overflow:hidden">
+                <div style="height:100%;width:${limitPct}%;background:${limitColor};border-radius:2px"></div>
+              </div>
+              <div style="font-size:10px;color:${limitColor};font-weight:600;margin-top:2px">${limitPct}% of ${sym}${Number(c.limit).toLocaleString('en-IN')} limit</div>
+            </div>`:''}
+          </div>`;
+        }).join('')}
+        ${unassigned>0?barRow('<span style="color:var(--ink-3)">Unassigned</span>',unassigned,ccTotal,cardMx,'#b0bec5'):''}
+      </div></div>
+    </div>`;
+  }
+
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="stat-card" style="--accent:var(--primary)">
+        <div class="stat-label">Methods Used</div>
+        <div class="stat-val">${sorted.length}</div>
+        <div class="stat-sub">This month</div>
+      </div>
+      <div class="stat-card" style="--accent:var(--green)">
+        <div class="stat-label">Most Used</div>
+        <div class="stat-val" style="font-size:15px;margin-top:4px">${topPay?topPay[0]:'—'}</div>
+        <div class="stat-sub">${topPay&&total?(topPay[1]/total*100).toFixed(1)+'% of spend':'No data'}</div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head">
+      <span class="card-title">Payment Methods · ${MONTHS[S.month]}</span>
+      <span style="font-size:11px;color:var(--ink-3)">% of month total</span>
+    </div><div class="card-body">${
+      sorted.length
+        ? `<div class="bar-list">${sorted.map(([pay,amt],i)=>
+            barRow('💳 '+pay, amt, total, mx, cols[i%cols.length])
+          ).join('')}</div>`
+        : '<div class="empty"><span class="material-icons-round">credit_card_off</span><p>No data</p></div>'
+    }</div></div>${ccSection}`;
 }
 
 // ── SMS IMPORT ─────────────────────────────────
 
-// ── Parser ─────────────────────────────────────
-// Returns {amount, merchant, date, paymentType, last4, isCredit, confidence:{amount,merchant,date,payment}}
-// confidence: 'high' | 'low'
+// ── SMS PARSER v2 ──────────────────────────────
+// Covers: SBI, PNB, BOB, Canara, Union, BOI, Indian Bank, Central Bank,
+//         HDFC, ICICI, Axis, Kotak, IndusInd, Yes, IDFC First, Federal,
+//         SIB, Karnataka, RBL, IDBI, AU SFB, Equitas, ESAF, Jana, Ujjivan,
+//         Paytm PB, Airtel PB, IPPB, SBI Card, Google Pay, PhonePe, BHIM,
+//         NACH/ECS, ATM, POS, NEFT, IMPS, RTGS, international transactions
 function parseSms(raw) {
   const txt = raw.replace(/\s+/g,' ').trim();
   const r = {
-    raw: txt,
-    amount: null, merchant: null, date: null,
-    paymentType: null, last4: null, isCredit: false,
+    raw: txt, amount: null, merchant: null, date: null,
+    paymentType: null, last4: null, isCredit: false, isRecurring: false,
     confidence: { amount:'low', merchant:'low', date:'low', payment:'low' }
   };
 
-  // ── Credit detection — skip salary, refund, credit, cashback ──
-  const creditPat = /\b(credited|credit|salary|refund|cashback|reversal|reward|bonus|received|deposited)\b/i;
-  if (creditPat.test(txt)) { r.isCredit = true; return r; }
-
-  // ── Amount ──
-  const amtPatterns = [
-    /(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)/i,
-    /([\d,]+(?:\.\d{1,2})?)\s*(?:INR|Rs\.?|₹)/i,
-    /(?:debited|deducted|paid|spent|transaction of|txn of)\s+(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
-    /(?:amount|amt)\s*[:\-]?\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+  // ── STEP 1: Credit detection ──
+  const walletTopup = /transferred.*(?:to|into).*(?:wallet|paytm|phonepe|gpay)/i;
+  const creditSig = [
+    /\b(credited)\b/i, /\b(salary|sal)\b/i,
+    /\b(refund|reversed|reversal)\b/i, /\b(cashback|cash\s*back)\b/i,
+    /\b(reward|reward\s*point)\b/i, /\b(bonus|incentive)\b/i,
+    /\b(deposited)\b/i, /\bmoney\s+received\b/i,
+    /Rs\.?\s*[\d,]+\s+(?:has been\s+)?received\s+(?:via|from)/i,
+    /\bpayment\s+received\b/i,
   ];
-  for (const p of amtPatterns) {
-    const m = txt.match(p);
-    if (m) {
-      r.amount = parseFloat(m[1].replace(/,/g,''));
-      r.confidence.amount = 'high';
-      break;
+  if (!walletTopup.test(txt) && creditSig.some(p=>p.test(txt))) { r.isCredit=true; return r; }
+
+  // ── STEP 2: Amount ──
+  const amtP = [
+    // International: "USD 50 (INR 4150)" — extract INR value
+    { p:/(?:USD|EUR|GBP|AUD|SGD|AED|JPY|CAD)[\s.]?[\d,.]+\s*\((?:INR|Rs\.?)\s*([\d,]+(?:\.\d{1,2})?)\)/i, g:1 },
+    // INR/Rs/₹ prefix — handles 1,50,000 lakh format
+    { p:/(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)/i, g:1 },
+    // Amount then INR
+    { p:/([\d,]+(?:\.\d{1,2})?)\s*(?:INR)\b/i, g:1 },
+    // "debited with Rs 500" / "spent Rs.500" / "charged Rs 500"
+    { p:/(?:debited?\s+(?:with\s+)?|deducted\s+|spent\s+|charged\s+|withdrawn\s+|of\s+)(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)/i, g:1 },
+    // "txn of Rs" / "charge of Rs" / "transaction of Rs"
+    { p:/(?:txn|transaction|charge)\s+of\s+(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i, g:1 },
+    // "amount Rs 500"
+    { p:/(?:amount|amt)\s*[:\-]?\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i, g:1 },
+  ];
+  for (const {p,g} of amtP) {
+    const m=txt.match(p);
+    if (m&&m[g]) {
+      const v=parseFloat(m[g].replace(/,/g,''));
+      if (v>0&&v<10000000) { r.amount=v; r.confidence.amount='high'; break; }
     }
   }
 
-  // ── Date ──
-  const today = new Date().toISOString().slice(0,10);
-  const datePatterns = [
-    // DD-Mon-YY or DD-Mon-YYYY
-    { p: /(\d{1,2})[-\/\s](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-\/\s,]?(\d{2,4})?/i,
-      fn: m => {
-        const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-        const mo = months[m[2].slice(0,3).toLowerCase()];
-        const yr = m[3] ? (m[3].length===2 ? 2000+parseInt(m[3]) : parseInt(m[3])) : new Date().getFullYear();
-        return new Date(yr, mo, parseInt(m[1]));
-      }
-    },
-    // DD/MM/YYYY or DD-MM-YYYY
-    { p: /(\d{2})[-\/](\d{2})[-\/](\d{2,4})/,
-      fn: m => {
-        const yr = m[3].length===2 ? 2000+parseInt(m[3]) : parseInt(m[3]);
-        return new Date(yr, parseInt(m[2])-1, parseInt(m[1]));
-      }
-    },
-    // YYYY-MM-DD
-    { p: /(\d{4})-(\d{2})-(\d{2})/,
-      fn: m => new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]))
-    },
+  // ── STEP 3: Date ──
+  const today=new Date().toISOString().slice(0,10);
+  const MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const dateP = [
+    // ISO: 2026-05-15
+    { p:/\b(\d{4})-(\d{2})-(\d{2})\b/, fn:m=>new Date(+m[1],+m[2]-1,+m[3]) },
+    // DD-Mon-YY/YYYY: 15-May-26, 15 May 2026
+    { p:/\b(\d{1,2})[-\s](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-\s,]?(\d{2,4})?\b/i,
+      fn:m=>{ const mo=MON[m[2].slice(0,3).toLowerCase()]; const yr=m[3]?(m[3].length===2?2000+parseInt(m[3]):+m[3]):new Date().getFullYear(); return new Date(yr,mo,+m[1]); }},
+    // DD/MM/YYYY or DD-MM-YY (strip trailing time if present)
+    { p:/\b(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})(?:\s+\d{2}:\d{2}(?::\d{2})?)?\b/,
+      fn:m=>{ const yr=m[3].length===2?2000+parseInt(m[3]):+m[3]; return new Date(yr,+m[2]-1,+m[1]); }},
   ];
-  for (const {p,fn} of datePatterns) {
-    const m = txt.match(p);
-    if (m) {
-      try {
-        const d = fn(m);
-        if (!isNaN(d.getTime())) {
-          r.date = d.toISOString().slice(0,10);
-          r.confidence.date = 'high';
-          break;
-        }
-      } catch {}
-    }
+  for (const {p,fn} of dateP) {
+    const m=txt.match(p); if (!m) continue;
+    try { const d=fn(m); if (!isNaN(d.getTime())&&d.getFullYear()>2000&&d.getFullYear()<2100) { r.date=d.toISOString().slice(0,10); r.confidence.date='high'; break; } } catch {}
   }
-  if (!r.date) { r.date = today; r.confidence.date = 'low'; }
+  if (!r.date) { r.date=today; r.confidence.date='low'; }
 
-  // ── Payment type ──
-  if (/\bUPI\b/i.test(txt))                          { r.paymentType='UPI';          r.confidence.payment='high'; }
-  else if (/\b(credit card|cc)\b/i.test(txt))        { r.paymentType='Credit Card';  r.confidence.payment='high'; }
-  else if (/\b(debit card|dc)\b/i.test(txt))         { r.paymentType='Debit Card';   r.confidence.payment='high'; }
-  else if (/\b(net.?banking|neft|imps|rtgs)\b/i.test(txt)) { r.paymentType='Net Banking'; r.confidence.payment='high'; }
-  else if (/\b(atm|cash)\b/i.test(txt))              { r.paymentType='Cash';         r.confidence.payment='high'; }
-  else                                                { r.paymentType='UPI';          r.confidence.payment='low'; }
+  // ── STEP 4: Payment type (order: most specific first) ──
+  if (/\b(credit\s*card|cc\s*ending|charged\s+on\s+.*card)\b/i.test(txt))
+    { r.paymentType='Credit Card'; r.confidence.payment='high'; }
+  else if (/\b(ATM\s*WDL|ATM\s*withdrawal|withdrawn.*\bATM\b|cash\s*withdrawal)\b/i.test(txt))
+    { r.paymentType='Cash'; r.confidence.payment='high'; }
+  else if (/\b(debit\s*card|POS\s*Txn|POS\s*transaction|CARD\s*TRANSACTION)\b/i.test(txt))
+    { r.paymentType='Debit Card'; r.confidence.payment='high'; }
+  else if (/\bUPI\b/i.test(txt)||/@(?:ok|ybl|axl|paytm|upi|icici|sbi|hdf|kotak|ibl|federal|jsb|apl|aubank|barodampay|fino|jiomoney|airtel|indus|sc|rbl|pnb|bob|oksbi|okicici|okhdfcbank|okaxis)\b/i.test(txt))
+    { r.paymentType='UPI'; r.confidence.payment='high'; }
+  else if (/\b(NEFT|IMPS|RTGS|net\s*banking|internet\s*banking|netbanking)\b/i.test(txt))
+    { r.paymentType='Net Banking'; r.confidence.payment='high'; }
+  else if (/\b(ECS|NACH|auto.?debit|standing\s*instruction)\b/i.test(txt))
+    { r.paymentType='Net Banking'; r.confidence.payment='high'; }
+  else if (/\b(wallet|paytm\s*wallet|phonepe\s*wallet)\b/i.test(txt))
+    { r.paymentType='UPI'; r.confidence.payment='high'; }
+  else
+    { r.paymentType='UPI'; r.confidence.payment='low'; }
 
-  // ── Last 4 digits of card/account ──
-  const last4m = txt.match(/[Xx*]{2,}(\d{4})/);
-  if (last4m) r.last4 = last4m[1];
-
-  // ── Merchant / payee ──
-  // Try various patterns in order of confidence
-  const merchantPatterns = [
-    // "to <merchant>" patterns
-    /\bto\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,30}?)(?:\s*(?:on|via|UPI|Ref|for|\.)|$)/i,
-    // "at <merchant>"
-    /\bat\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,30}?)(?:\s*(?:on|via|Ref|for|\.)|$)/i,
-    // VPA patterns like merchant@upi
-    /\b([A-Za-z][A-Za-z0-9]{2,})\s*@[a-z]+/i,
-    // "Info: UPI/<merchant>"
-    /Info:\s*(?:UPI\/)?([A-Za-z][A-Za-z0-9\s&]{2,25})/i,
-    // "paid to <merchant>"
-    /paid\s+to\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,30})/i,
-    // Merchant name in caps at end
-    /(?:at|towards)\s+([A-Z][A-Z\s&]{3,25})\b/,
+  // ── STEP 5: Last 4 digits ──
+  const l4p=[
+    /(?:[Xx*]{2,}|ending\s+)(\d{4,5})\b/i,
+    /[Aa]\/[Cc]\s*(?:no\.?\s*)?[Xx*]{2,}(\d{4})/i,
+    /card\s+(?:ending\s+)?(\d{4,5})\b/i,
   ];
-  for (const p of merchantPatterns) {
-    const m = txt.match(p);
-    if (m) {
-      const candidate = m[1].trim().replace(/\s+/g,' ');
-      // Filter out noise words
-      const noise = /^(your|the|a|an|account|bank|card|UPI|IMPS|NEFT|net|banking|ref|no|on|via|for)$/i;
-      if (!noise.test(candidate) && candidate.length > 1) {
-        r.merchant = candidate.charAt(0).toUpperCase() + candidate.slice(1);
-        r.confidence.merchant = 'high';
-        break;
-      }
-    }
+  for (const p of l4p) { const m=txt.match(p); if (m) { r.last4=m[1].slice(-4); break; } }
+
+  // ── STEP 6: Merchant extraction ──
+  const NOISE=new Set(['your','the','a','an','account','bank','card','upi','imps','neft','rtgs','net',
+    'banking','ref','no','on','via','for','from','to','towards','info','dear','customer','user',
+    'alert','debit','credit','transaction','txn','payment','transfer','balance','available',
+    'avl','avbl','bal','limit','lmt','thank','thanks','you','is','has','been','with',
+    'hdfc','icici','axis','sbi','kotak','yes','rbl','idfc','federal','indusind','canara',
+    'bob','pnb','union','ubi','cbi','ippb','paytm','phonepe','gpay','bhim','google','amazon']);
+
+  function cleanM(s) {
+    if (!s) return null;
+    s=s.trim().replace(/\s+/g,' ').replace(/[,\.\-:\/]+$/,'').trim();
+    s=s.replace(/\s*(?:ref|utr|txn)[:\s]*\d+.*/i,'').trim();
+    if (s.length<2||/^\d+$/.test(s)||NOISE.has(s.toLowerCase())||/^[xX*]+\d+$/.test(s)) return null;
+    return s.charAt(0).toUpperCase()+s.slice(1);
   }
 
-  // Auto-match credit card by last4
-  if (r.paymentType === 'Credit Card' && r.last4) {
-    const matched = S.cards.find(c => c.last4 === r.last4);
-    if (matched) r.cardId = matched.id;
+  const mPatterns=[
+    // SBI: "towards UPI-SWIGGY-swiggy@icici"
+    { p:/towards\s+UPI-([A-Za-z][A-Za-z0-9\s&]+?)-[a-z]/i, g:1 },
+    // HDFC: "Info: UPI/SWIGGY/ref123"
+    { p:/Info:\s*(?:UPI|NEFT|IMPS|RTGS)\/([A-Za-z][A-Za-z0-9\s&\-\.]{1,30}?)(?:\/|\s|$)/i, g:1 },
+    // VPA known banks: "swiggy@okicici"
+    { p:/([A-Za-z][A-Za-z0-9._]{2,})\s*@(?:ok|ybl|axl|paytm|upi|icici|sbi|hdf|kotak|ibl|federal|jsb|apl|aubank|airtel|indus|sc|rbl|pnb|bob|oksbi|okicici|okhdfcbank|okaxis)\b/i, g:1 },
+    // Generic VPA
+    { p:/([A-Za-z][A-Za-z0-9._]{2,})\s*@[a-z]{2,}/i, g:1 },
+    // "paid/sent to MERCHANT on/via"
+    { p:/(?:paid|sent|transferred)\s+to\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,35}?)(?:\s+(?:on|via|UPI|Ref|for|at|\.|,)|$)/i, g:1 },
+    // "at MERCHANT" (POS/card)
+    { p:/\bat\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,35}?)(?:\s+(?:on|via|Ref|for|\.)|$)/i, g:1 },
+    // "for MERCHANT" (subscriptions)
+    { p:/\bfor\s+([A-Za-z][A-Za-z0-9\s&\-\.]{2,30}?)(?:\s+(?:on|via|Ref|\.)|$)/i, g:1 },
+    // "to MERCHANT on/via"
+    { p:/\bto\s+([A-Za-z][A-Za-z0-9\s&\-\.]{1,30}?)(?:\s+(?:on|via|UPI|Ref|for|\.)|$)/i, g:1 },
+    // ALL CAPS merchant
+    { p:/(?:at|towards)\s+([A-Z][A-Z\s&\.]{3,30})\b(?!\s*\d)/g, g:1 },
+    // "Rs X paid to MERCHANT on"
+    { p:/Rs\.?\s*[\d,]+\s+(?:paid|sent)\s+to\s+([A-Za-z][A-Za-z0-9\s&]{2,25}?)(?:\s+on\b)/i, g:1 },
+  ];
+  for (const {p,g} of mPatterns) {
+    const m=txt.match(p); if (!m||!m[g]) continue;
+    const c=cleanM(m[g]); if (c) { r.merchant=c; r.confidence.merchant='high'; break; }
   }
+
+  // ── STEP 7: Auto-match card by last4 ──
+  if (r.last4) {
+    const matched=S.cards.find(c=>c.last4===r.last4);
+    if (matched) r.cardId=matched.id;
+  }
+
+  // ── STEP 8: Recurring flag ──
+  if (/\b(ECS|NACH|auto.?debit|standing\s*instruction|subscription)\b/i.test(txt))
+    r.isRecurring=true;
 
   return r;
 }
@@ -1739,18 +2390,14 @@ function openSmsConfirm(id) {
   document.getElementById('smsAmtSym').textContent = sym;
 
   // confidence badges
-  document.getElementById('smsDescConf').outerHTML = confBadge(p.confidence?.merchant||'low')
-    .replace('>', ' id="smsDescConf">');
-  document.getElementById('smsAmtConf').outerHTML  = confBadge(p.confidence?.amount||'low')
-    .replace('>', ' id="smsAmtConf">');
-  document.getElementById('smsDateConf').outerHTML = confBadge(p.confidence?.date||'low')
-    .replace('>', ' id="smsDateConf">');
-  document.getElementById('smsPayConf').outerHTML  = confBadge(p.confidence?.payment||'low')
-    .replace('>', ' id="smsPayConf">');
+  document.getElementById('smsDescConf').outerHTML = confBadge(p.confidence?.merchant||'low').replace('>', ' id="smsDescConf">');
+  document.getElementById('smsAmtConf').outerHTML  = confBadge(p.confidence?.amount||'low').replace('>', ' id="smsAmtConf">');
+  document.getElementById('smsDateConf').outerHTML = confBadge(p.confidence?.date||'low').replace('>', ' id="smsDateConf">');
+  document.getElementById('smsPayConf').outerHTML  = confBadge(p.confidence?.payment||'low').replace('>', ' id="smsPayConf">');
 
-  // category chips — try to auto-guess from merchant
-  const guessedCat = guessCategoryFromMerchant(p.merchant);
-  renderSmsCatChips(guessedCat);
+  // auto-guess cat + sub
+  const [guessedCat, guessedSub] = guessCategoryFromMerchant(p.merchant);
+  renderSmsCatChips(guessedCat, guessedSub);
 
   // card picker
   if (p.paymentType==='Credit Card' && S.cards.length>0) {
@@ -1759,7 +2406,6 @@ function openSmsConfirm(id) {
   } else {
     document.getElementById('smsCardPickerGroup').style.display='none';
   }
-
   openSheet('smsConfirmSheet');
 }
 
@@ -1767,49 +2413,85 @@ function onSmsPaymentChange() {
   const pay = document.getElementById('smsFPayment').value;
   const grp = document.getElementById('smsCardPickerGroup');
   if (pay==='Credit Card' && S.cards.length>0) {
-    grp.style.display='block';
-    renderSmsCardChips(null);
+    grp.style.display='block'; renderSmsCardChips(null);
   } else { grp.style.display='none'; }
 }
 
-function renderSmsCatChips(selId) {
+function renderSmsCatChips(selId, selSubId) {
   document.getElementById('smsCatChips').innerHTML = S.categories.map(c=>
-    `<div class="chip ${c.id===selId?'sel':''}" onclick="selSmsChip('${c.id}',this,'smsCatChips')" data-id="${c.id}">${c.emoji} ${c.name}</div>`
+    `<div class="chip ${c.id===selId?'sel':''}" onclick="selSmsCatChip('${c.id}',this)" data-id="${c.id}">${c.emoji} ${c.name}</div>`
   ).join('');
+  if(isDetailed() && selId) renderSubChips('smsSubCatChips','smsSubCatGroup',selId,selSubId||null);
+  else document.getElementById('smsSubCatGroup').style.display='none';
+}
+function selSmsCatChip(id, el) {
+  document.querySelectorAll('#smsCatChips .chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  if(isDetailed()) renderSubChips('smsSubCatChips','smsSubCatGroup',id,null);
+  else document.getElementById('smsSubCatGroup').style.display='none';
 }
 function renderSmsCardChips(selId) {
   document.getElementById('smsCardChips').innerHTML = S.cards.map(c=>
-    `<div class="chip ${c.id===selId?'sel':''}" onclick="selSmsChip('${c.id}',this,'smsCardChips')" data-id="${c.id}" style="${c.id===selId?'background:rgba('+rgb(c.color)+',.15);border-color:'+c.color+';color:'+c.color:''}">
+    `<div class="chip ${c.id===selId?'sel':''}" onclick="selSmsCardChip('${c.id}',this)" data-id="${c.id}"
+      style="${c.id===selId?'background:rgba('+rgb(c.color)+',.15);border-color:'+c.color+';color:'+c.color:''}">
       <span style="width:10px;height:10px;border-radius:50%;background:${c.color};display:inline-block;flex-shrink:0"></span> ${cardLabel(c)}
     </div>`
   ).join('');
 }
-function selSmsChip(id, el, containerId) {
-  document.querySelectorAll(`#${containerId} .chip`).forEach(c=>{
+function selSmsCardChip(id, el) {
+  document.querySelectorAll('#smsCardChips .chip').forEach(c=>{
     c.classList.remove('sel'); c.style.background=''; c.style.borderColor=''; c.style.color='';
   });
   el.classList.add('sel');
-  if (containerId==='smsCardChips') {
-    const c=getCard(id);
-    if(c){el.style.background=`rgba(${rgb(c.color)},.15)`;el.style.borderColor=c.color;el.style.color=c.color;}
-  }
+  const c=getCard(id);
+  if(c){el.style.background=`rgba(${rgb(c.color)},.15)`;el.style.borderColor=c.color;el.style.color=c.color;}
 }
 function getSmsCat()  { return document.querySelector('#smsCatChips .chip.sel')?.dataset.id||'other'; }
+function getSmsSub()  { return document.querySelector('#smsSubCatChips .chip.sel')?.dataset.id||null; }
 function getSmsCard() { return document.querySelector('#smsCardChips .chip.sel')?.dataset.id||null; }
 
-// ── Auto-guess category from merchant name ──
+// ── Auto-guess category + sub from merchant name ──
+// Returns [categoryId, subcategoryId|null]
 function guessCategoryFromMerchant(merchant) {
-  if (!merchant) return null;
+  if (!merchant) return [null, null];
   const m = merchant.toLowerCase();
-  if (/swiggy|zomato|uber\s*eat|food|restaurant|cafe|biryani|pizza|burger|domino|kfc|mcd|subway|hotel/.test(m)) return 'food';
-  if (/uber|ola|rapido|metro|bus|train|irctc|railway|petrol|fuel|parking|toll/.test(m)) return 'transport';
-  if (/amazon|flipkart|myntra|ajio|nykaa|meesho|snapdeal|shopping|mart|store/.test(m)) return 'shopping';
-  if (/electricity|water|gas|broadband|airtel|jio|vi |vodafone|bsnl|bill|recharge/.test(m)) return 'bills';
-  if (/apollo|medplus|pharma|hospital|clinic|doctor|health|practo|1mg/.test(m)) return 'health';
-  if (/netflix|hotstar|spotify|prime|bookmyshow|inox|pvr|gaming|steam/.test(m)) return 'entertainment';
-  if (/udemy|coursera|byju|unacademy|school|college|tuition|book/.test(m)) return 'education';
-  if (/salon|spa|gym|fitness|cult\.fit|grooming/.test(m)) return 'personal';
-  return null;
+  if (/swiggy|zomato|uber\s*eat/.test(m))                                                                        return ['food','food_delivery'];
+  if (/restaurant|cafe|dhaba|biryani|pizza|burger|domino|kfc|mcd|subway|barbeque|buffet/.test(m))               return ['food','food_restaurant'];
+  if (/grofer|bigbasket|jiomart|dmart|supermarket|grocery|kirana/.test(m))                                       return ['food','food_groceries'];
+  if (/starbucks|cafe coffee|chaayos|third wave|barista/.test(m))                                                 return ['food','food_cafe'];
+  if (/bar |pub |brewery|liquor|wine|beer|whisky/.test(m))                                                        return ['food','food_drinks'];
+  if (/food|restaurant|hotel/.test(m))                                                                            return ['food', null];
+  if (/uber|ola|rapido/.test(m))                                                                                  return ['transport','transport_cab'];
+  if (/metro|bus|irctc|railway|train/.test(m))                                                                    return ['transport','transport_public'];
+  if (/petrol|fuel|hp |bpcl|iocl|shell|cng/.test(m))                                                             return ['transport','transport_fuel'];
+  if (/parking|fastag|toll/.test(m))                                                                              return ['transport','transport_parking'];
+  if (/amazon|flipkart|myntra|ajio|meesho|snapdeal/.test(m))                                                      return ['shopping','shopping_general'];
+  if (/nykaa|sephora|makeup|cosmetics/.test(m))                                                                   return ['shopping','shopping_general'];
+  if (/electricity|bescom|tneb|msedcl|power/.test(m))                                                            return ['bills','bills_electricity'];
+  if (/airtel|jio|vi |vodafone|bsnl|mobile|recharge/.test(m))                                                    return ['bills','bills_mobile'];
+  if (/broadband|internet|act |hathway|den /.test(m))                                                            return ['bills','bills_internet'];
+  if (/gas|lpg|cylinder|indane|hp gas|bharat gas/.test(m))                                                       return ['bills','bills_gas'];
+  if (/apollo|medplus|pharma|1mg|netmeds|medicine|drug/.test(m))                                                  return ['medical','medical_pharmacy'];
+  if (/hospital|clinic|nursing|emergency/.test(m))                                                                return ['medical','medical_hospital'];
+  if (/doctor|physician|specialist|practo|consult/.test(m))                                                       return ['medical','medical_doctor'];
+  if (/lab|diagnostic|pathology|blood test|scan|mri|xray/.test(m))                                               return ['medical','medical_lab'];
+  if (/dental|dentist|orthodon/.test(m))                                                                          return ['medical','medical_dental'];
+  if (/gym|cult\.fit|crossfit|fitness/.test(m))                                                                   return ['fitness','fitness_gym'];
+  if (/swimming|yoga|zumba|pilates|aerobic/.test(m))                                                              return ['fitness','fitness_gym'];
+  if (/protein|supplement|whey|creatine/.test(m))                                                                 return ['fitness','fitness_supplements'];
+  if (/makemytrip|goibibo|cleartrip|ixigo|yatra|flight|indigo|airindia/.test(m))                                 return ['travel','travel_transport'];
+  if (/airbnb|oyo|hotel|resort|inn|stay|booking\.com/.test(m))                                                   return ['travel','travel_stay'];
+  if (/netflix|hotstar|prime video|disney/.test(m))                                                              return ['entertainment','entertainment_streaming'];
+  if (/spotify|gaana|wynk|jiosaavn/.test(m))                                                                     return ['entertainment','entertainment_streaming'];
+  if (/bookmyshow|pvr|inox|cinepolis|movie/.test(m))                                                             return ['entertainment','entertainment_movies'];
+  if (/steam|playstation|xbox|gaming/.test(m))                                                                    return ['entertainment','entertainment_gaming'];
+  if (/udemy|coursera|byju|unacademy|skill/.test(m))                                                              return ['education','education_courses'];
+  if (/school|college|university|tuition|coaching/.test(m))                                                       return ['education','education_fees'];
+  if (/salon|barbershop|haircut|grooming/.test(m))                                                                return ['personal','personal_salon'];
+  if (/spa|massage|wellness/.test(m))                                                                              return ['personal','personal_wellness'];
+  if (/rent|plumber|electrician|carpenter|maid|housekeeping/.test(m))                                            return ['home', null];
+  if (/donation|charity|temple|church|mosque|ngo/.test(m))                                                       return ['gifts','gifts_charity'];
+  return [null, null];
 }
 
 // ── Confirm: save as expense ──
@@ -1821,6 +2503,7 @@ function confirmSmsItem() {
   const payment = document.getElementById('smsFPayment').value;
   const notes   = document.getElementById('smsFNotes').value.trim();
   const catId   = getSmsCat();
+  const subId   = isDetailed() ? getSmsSub() : null;
 
   if (!desc) { toast('Add a description','err'); return; }
   if (!amt||amt<=0) { toast('Enter valid amount','err'); return; }
@@ -1831,7 +2514,7 @@ function confirmSmsItem() {
     if (!cardId) { toast('Select a credit card','err'); return; }
   }
 
-  S.expenses.push({id:uid(),description:desc,amount:amt,date,category:catId,paymentType:payment,notes,cardId,createdAt:new Date().toISOString()});
+  S.expenses.push({id:uid(),description:desc,amount:amt,date,category:catId,subcategory:subId,paymentType:payment,notes,cardId,createdAt:new Date().toISOString()});
   q.status = 'saved';
   persist();
   closeSheet('smsConfirmSheet');
@@ -1873,38 +2556,223 @@ function handleShareTarget() {
 }
 
 // ── CATEGORIES ─────────────────────────────────
+let expandedCatId = null; // which main cat is expanded in list
+
 function renderCatList() {
-  document.getElementById('catListEl').innerHTML = S.categories.map(c=>{
-    const count=S.expenses.filter(e=>e.category===c.id).length;
-    const tot=S.expenses.filter(e=>e.category===c.id).reduce((s,e)=>s+e.amount,0);
-    const isDefault=DEFAULT_CATS.some(d=>d.id===c.id);
-    return`<div class="cat-item">
-      <div class="cat-emoji-badge" style="background:rgba(${rgb(c.color)},.15)">${c.emoji}</div>
-      <div class="cat-info"><div class="cat-name-t">${c.name}</div><div class="cat-count">${count} expenses · ${fmt(tot)}</div></div>
-      <div style="width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:8px"></div>
-      ${isDefault?'<div style="width:36px"></div>':`<button class="btn-icon-round" onclick="delCat('${c.id}')"><span class="material-icons-round" style="font-size:18px;color:var(--red)">delete</span></button>`}
+  const el = document.getElementById('catListEl');
+  el.innerHTML = S.categories.map(c => {
+    const mainCount = S.expenses.filter(e=>e.category===c.id).length;
+    const mainTot   = S.expenses.filter(e=>e.category===c.id).reduce((s,e)=>s+e.amount,0);
+    const isDefault = DEFAULT_CATS.some(d=>d.id===c.id);
+    const subs      = getSubs(c.id);
+    const isExpanded = expandedCatId === c.id;
+
+    return `<div style="margin-bottom:8px">
+      <!-- Main category row -->
+      <div class="cat-item" style="cursor:pointer;border-radius:${isExpanded?'var(--rsm) var(--rsm) 0 0':'var(--rsm)'};margin-bottom:0"
+        onclick="toggleCatExpand('${c.id}')">
+        <div class="cat-emoji-badge" style="background:rgba(${rgb(c.color)},.15)">${c.emoji}</div>
+        <div class="cat-info">
+          <div class="cat-name-t">${c.name}</div>
+          <div class="cat-count">${mainCount} expense${mainCount!==1?'s':''} · ${fmt(mainTot)}
+            ${subs.length ? `<span style="color:var(--ink-3)"> · ${subs.length} sub${subs.length!==1?'s':''}</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${c.color}"></div>
+          <button class="btn-icon-round" onclick="event.stopPropagation();openCatSheet('${c.id}','edit')"
+            title="Edit" style="width:30px;height:30px">
+            <span class="material-icons-round" style="font-size:15px">edit</span>
+          </button>
+          ${!isDefault ? `<button class="btn-icon-round" onclick="event.stopPropagation();delCat('${c.id}')"
+            title="Delete" style="width:30px;height:30px">
+            <span class="material-icons-round" style="font-size:15px;color:var(--red)">delete</span>
+          </button>` : `<div style="width:30px"></div>`}
+          <span class="material-icons-round" style="font-size:18px;color:var(--ink-3);transition:transform .2s;transform:rotate(${isExpanded?180:0}deg)">
+            expand_more
+          </span>
+        </div>
+      </div>
+      <!-- Sub-categories (expanded) -->
+      ${isExpanded ? `
+      <div style="background:var(--surface-3);border-radius:0 0 var(--rsm) var(--rsm);padding:8px 10px 10px;border:1px solid var(--border);border-top:none">
+        ${subs.map(s => {
+          const sCount = S.expenses.filter(e=>e.subcategory===s.id).length;
+          const isCustom = (S.customSubs[c.id]||[]).some(cs=>cs.id===s.id);
+          return `<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;background:var(--surface);border-radius:var(--rsm);margin-bottom:5px">
+            <span style="font-size:18px;width:28px;text-align:center">${s.emoji}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:500">${s.name}</div>
+              <div style="font-size:11px;color:var(--ink-3);margin-top:1px">${s.desc||''}</div>
+            </div>
+            <div style="font-size:11px;color:var(--ink-3);white-space:nowrap">${sCount} exp</div>
+            <button class="btn-icon-round" onclick="openCatSheet('${c.id}','edit-sub','${s.id}')"
+              style="width:28px;height:28px;flex-shrink:0">
+              <span class="material-icons-round" style="font-size:14px">edit</span>
+            </button>
+            ${isCustom ? `<button class="btn-icon-round" onclick="delSub('${c.id}','${s.id}')"
+              style="width:28px;height:28px;flex-shrink:0">
+              <span class="material-icons-round" style="font-size:14px;color:var(--red)">delete</span>
+            </button>` : `<div style="width:28px;flex-shrink:0"></div>`}
+          </div>`;
+        }).join('')}
+        <button class="btn btn-ghost btn-full" style="margin-top:4px;padding:8px;font-size:13px;border-radius:var(--rsm)"
+          onclick="openCatSheet('${c.id}','add-sub')">
+          <span class="material-icons-round" style="font-size:16px">add</span> Add sub-category
+        </button>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
-function openCatSheet() {
-  document.getElementById('cEmoji').value='';
-  document.getElementById('cName').value='';
-  document.getElementById('cColor').value='#1a73e8';
+
+function toggleCatExpand(id) {
+  expandedCatId = expandedCatId === id ? null : id;
+  renderCatList();
+}
+
+// mode: null = new main, 'edit' = edit main, 'add-sub' = new sub, 'edit-sub' = edit sub
+let _catSheetMode = null;
+let _catSheetParentId = null;
+let _catSheetSubId = null;
+
+function openCatSheet(parentId, mode, subId) {
+  _catSheetMode = mode || null;
+  _catSheetParentId = parentId || null;
+  _catSheetSubId = subId || null;
+
+  const parentRow  = document.getElementById('catSheetParentRow');
+  const colorRow   = document.getElementById('cColorRow');
+  const titleEl    = document.getElementById('catSheetTitle');
+  const saveBtnEl  = document.getElementById('saveCatBtn');
+
+  // Defaults
+  document.getElementById('cEmoji').value = '';
+  document.getElementById('cName').value  = '';
+  document.getElementById('cDesc').value  = '';
+  document.getElementById('cColor').value = '#1a73e8';
+  parentRow.style.display = 'none';
+  colorRow.style.display  = 'block';
+
+  if (!mode) {
+    // New main category
+    titleEl.textContent   = 'New Category';
+    saveBtnEl.textContent = 'Add Category';
+
+  } else if (mode === 'edit') {
+    // Edit main category
+    const c = S.categories.find(x=>x.id===parentId);
+    if (!c) return;
+    titleEl.textContent   = 'Edit Category';
+    saveBtnEl.textContent = 'Save';
+    document.getElementById('cEmoji').value = c.emoji;
+    document.getElementById('cName').value  = c.name;
+    document.getElementById('cDesc').value  = c.desc||'';
+    document.getElementById('cColor').value = c.color;
+
+  } else if (mode === 'add-sub') {
+    // New sub-category under parent
+    const c = S.categories.find(x=>x.id===parentId);
+    titleEl.textContent   = 'New Sub-category';
+    saveBtnEl.textContent = 'Add Sub-category';
+    colorRow.style.display = 'none'; // subs inherit parent color
+    parentRow.style.display = 'flex';
+    document.getElementById('catSheetParentLabel').innerHTML =
+      `<span style="margin-right:6px">${c?.emoji||''}</span>${c?.name||''}`;
+
+  } else if (mode === 'edit-sub') {
+    // Edit existing sub
+    const sub = getSub(subId);
+    const c   = S.categories.find(x=>x.id===parentId);
+    titleEl.textContent   = 'Edit Sub-category';
+    saveBtnEl.textContent = 'Save';
+    colorRow.style.display = 'none';
+    parentRow.style.display = 'flex';
+    document.getElementById('catSheetParentLabel').innerHTML =
+      `<span style="margin-right:6px">${c?.emoji||''}</span>${c?.name||''}`;
+    if (sub) {
+      document.getElementById('cEmoji').value = sub.emoji;
+      document.getElementById('cName').value  = sub.name;
+      document.getElementById('cDesc').value  = sub.desc||'';
+    }
+  }
+
   openSheet('catSheet');
 }
+
 function saveCat() {
-  const emoji=document.getElementById('cEmoji').value.trim()||'📦';
-  const name=document.getElementById('cName').value.trim();
-  const color=document.getElementById('cColor').value;
-  if(!name){toast('Enter a name','err');return;}
-  if(S.categories.find(c=>c.name.toLowerCase()===name.toLowerCase())){toast('Already exists','err');return;}
-  S.categories.push({id:uid(),name,emoji,color});
-  persist(); closeSheet('catSheet'); renderCatList(); toast('Category added','ok');
+  const emoji = document.getElementById('cEmoji').value.trim() || '📦';
+  const name  = document.getElementById('cName').value.trim();
+  const desc  = document.getElementById('cDesc').value.trim();
+  const color = document.getElementById('cColor').value;
+  if (!name) { toast('Enter a name','err'); return; }
+
+  if (!_catSheetMode) {
+    // Add new main category
+    if (S.categories.find(c=>c.name.toLowerCase()===name.toLowerCase()))
+      { toast('Already exists','err'); return; }
+    S.categories.push({id:uid(), name, emoji, color, desc});
+    toast('Category added','ok');
+
+  } else if (_catSheetMode === 'edit') {
+    // Edit main category
+    const idx = S.categories.findIndex(c=>c.id===_catSheetParentId);
+    if (idx>-1) { S.categories[idx] = {...S.categories[idx], name, emoji, color, desc}; }
+    toast('Updated','ok');
+
+  } else if (_catSheetMode === 'add-sub') {
+    // Add custom sub
+    const newSub = { id: _catSheetParentId+'_'+uid(), name, emoji, desc };
+    if (!S.customSubs[_catSheetParentId]) S.customSubs[_catSheetParentId] = [];
+    S.customSubs[_catSheetParentId].push(newSub);
+    toast('Sub-category added','ok');
+
+  } else if (_catSheetMode === 'edit-sub') {
+    // Edit sub — only custom subs are editable in full; default subs only name+emoji+desc
+    const isCustom = (S.customSubs[_catSheetParentId]||[]).some(s=>s.id===_catSheetSubId);
+    if (isCustom) {
+      const arr = S.customSubs[_catSheetParentId];
+      const idx = arr.findIndex(s=>s.id===_catSheetSubId);
+      if (idx>-1) arr[idx] = {...arr[idx], name, emoji, desc};
+    } else {
+      // Default sub override — store in customSubs as override
+      if (!S.customSubs[_catSheetParentId]) S.customSubs[_catSheetParentId] = [];
+      // Mark as override (keep original id)
+      const existing = S.customSubs[_catSheetParentId].findIndex(s=>s.id===_catSheetSubId);
+      if (existing>-1) S.customSubs[_catSheetParentId][existing] = {id:_catSheetSubId,name,emoji,desc};
+      else S.customSubs[_catSheetParentId].push({id:_catSheetSubId,name,emoji,desc,_override:true});
+    }
+    toast('Updated','ok');
+  }
+
+  persist(); closeSheet('catSheet'); renderCatList();
 }
+
 function delCat(id) {
-  if(S.expenses.some(e=>e.category===id)){toast('In use — reassign first','err');return;}
-  S.categories=S.categories.filter(c=>c.id!==id);
+  const count = S.expenses.filter(e=>e.category===id).length;
+  if (count > 0) { toast(`${count} expense${count!==1?'s':''} use this — reassign first`,'err'); return; }
+  S.categories = S.categories.filter(c=>c.id!==id);
+  delete S.customSubs[id];
   persist(); renderCatList(); toast('Deleted');
+}
+
+function delSub(parentId, subId) {
+  const count = S.expenses.filter(e=>e.subcategory===subId).length;
+  if (count > 0) { toast(`${count} expense${count!==1?'s':''} use this sub — reassign first`,'err'); return; }
+  if (S.customSubs[parentId]) {
+    S.customSubs[parentId] = S.customSubs[parentId].filter(s=>s.id!==subId);
+  }
+  persist(); renderCatList(); toast('Sub-category deleted');
+}
+
+// Override getSubs to apply custom overrides on top of defaults
+function getSubs(parentId) {
+  const defaults = (DEFAULT_SUBS[parentId] || []).map(s => {
+    // Check if there's a custom override for this default sub
+    const override = (S.customSubs[parentId]||[]).find(cs=>cs.id===s.id&&cs._override);
+    return override ? {...s,...override} : s;
+  });
+  const customs = (S.customSubs[parentId]||[]).filter(cs=>!cs._override);
+  return [...defaults, ...customs];
 }
 
 // ── CREDIT CARDS ───────────────────────────────
@@ -2035,7 +2903,8 @@ function openAddSheet(date) {
   document.getElementById('fNotes').value='';
   document.getElementById('amtSym').textContent=CUR[S.settings.currency]||'₹';
   document.getElementById('cardPickerGroup').style.display='none';
-  renderCatChips(null);
+  document.getElementById('subCatGroup').style.display='none';
+  renderCatChips(null, null);
   openSheet('expSheet');
   setTimeout(()=>document.getElementById('fDesc').focus(),300);
 }
@@ -2050,8 +2919,7 @@ function editExp(id) {
   document.getElementById('fPayment').value=e.paymentType;
   document.getElementById('fNotes').value=e.notes||'';
   document.getElementById('amtSym').textContent=CUR[S.settings.currency]||'₹';
-  renderCatChips(e.category);
-  // card picker
+  renderCatChips(e.category, e.subcategory||null);
   if(e.paymentType==='Credit Card' && S.cards.length>0) {
     document.getElementById('cardPickerGroup').style.display='block';
     renderCardChips(e.cardId||null);
@@ -2060,16 +2928,35 @@ function editExp(id) {
   }
   openSheet('expSheet');
 }
-function renderCatChips(sel) {
+function renderCatChips(sel, subSel) {
   document.getElementById('catChips').innerHTML=S.categories.map(c=>
-    `<div class="chip ${c.id===sel?'sel':''}" onclick="selChip('${c.id}',this)" data-id="${c.id}">${c.emoji} ${c.name}</div>`
+    `<div class="chip ${c.id===sel?'sel':''}" onclick="selCatChip('${c.id}',this)" data-id="${c.id}">${c.emoji} ${c.name}</div>`
+  ).join('');
+  if(isDetailed() && sel) renderSubChips('subCatChips','subCatGroup',sel,subSel||null);
+  else document.getElementById('subCatGroup').style.display='none';
+}
+function renderSubChips(chipsId,groupId,parentId,selSubId) {
+  const subs=getSubs(parentId);
+  const grp=document.getElementById(groupId);
+  if(!subs.length){grp.style.display='none';return;}
+  grp.style.display='block';
+  document.getElementById(chipsId).innerHTML=subs.map(s=>
+    `<div class="chip ${s.id===selSubId?'sel':''}" onclick="selSubChip('${s.id}','${chipsId}',this)"
+      data-id="${s.id}" title="${s.desc||''}">${s.emoji} ${s.name}</div>`
   ).join('');
 }
-function selChip(id,el) {
+function selCatChip(id,el) {
   document.querySelectorAll('#catChips .chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  if(isDetailed()) renderSubChips('subCatChips','subCatGroup',id,null);
+  else document.getElementById('subCatGroup').style.display='none';
+}
+function selSubChip(id,containerId,el) {
+  document.querySelectorAll(`#${containerId} .chip`).forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
 }
 function getSelCat() { return document.querySelector('#catChips .chip.sel')?.dataset.id||'other'; }
+function getSelSub() { return document.querySelector('#subCatChips .chip.sel')?.dataset.id||null; }
 function saveExp() {
   const desc=document.getElementById('fDesc').value.trim();
   const amt=parseFloat(document.getElementById('fAmt').value);
@@ -2077,21 +2964,21 @@ function saveExp() {
   const payment=document.getElementById('fPayment').value;
   const notes=document.getElementById('fNotes').value.trim();
   const catId=getSelCat();
+  const subId=isDetailed()?getSelSub():null;
   if(!desc){toast('Add a description','err');return;}
   if(!amt||amt<=0){toast('Enter valid amount','err');return;}
   if(!date){toast('Pick a date','err');return;}
-  // card validation
-  let cardId = null;
-  if(payment==='Credit Card' && S.cards.length>0) {
-    cardId = getSelCard();
+  let cardId=null;
+  if(payment==='Credit Card'&&S.cards.length>0){
+    cardId=getSelCard();
     if(!cardId){toast('Select a credit card','err');return;}
   }
-  if(S.editId) {
+  if(S.editId){
     const i=S.expenses.findIndex(e=>e.id===S.editId);
-    S.expenses[i]={...S.expenses[i],description:desc,amount:amt,date,category:catId,paymentType:payment,notes,cardId};
+    S.expenses[i]={...S.expenses[i],description:desc,amount:amt,date,category:catId,subcategory:subId,paymentType:payment,notes,cardId};
     toast('Updated','ok');
   } else {
-    S.expenses.push({id:uid(),description:desc,amount:amt,date,category:catId,paymentType:payment,notes,cardId,createdAt:new Date().toISOString()});
+    S.expenses.push({id:uid(),description:desc,amount:amt,date,category:catId,subcategory:subId,paymentType:payment,notes,cardId,createdAt:new Date().toISOString()});
     toast('Added ✓','ok');
   }
   persist(); closeSheet('expSheet'); refreshActive();
@@ -2125,12 +3012,18 @@ function updatePreview() {
 function buildExport(exps,m,y,type) {
   const sym=CUR[S.settings.currency]||'₹', cur=S.settings.currency;
   if(type==='csv') {
-    return ['Date,Description,Category,Amount,Currency,Payment,Notes',
-      ...exps.map(e=>`${e.date},"${e.description}","${cat(e.category).name}",${e.amount},${cur},${e.paymentType},"${e.notes||''}"`)
+    return ['Date,Description,Category,Sub-category,Amount,Currency,Payment,Notes',
+      ...exps.map(e=>{
+        const subName = e.subcategory ? (getSub(e.subcategory)?.name||e.subcategory) : '';
+        return `${e.date},"${e.description}","${cat(e.category).name}","${subName}",${e.amount},${cur},${e.paymentType},"${e.notes||''}"`;
+      })
     ].join('\n');
   } else if(type==='json') {
     return JSON.stringify({month:FMONTHS[m],year:y,currency:cur,total:exps.reduce((s,e)=>s+e.amount,0),count:exps.length,
-      expenses:exps.map(e=>({...e,categoryName:cat(e.category).name,cardName:e.cardId?getCard(e.cardId)?.name||'':null,currency:cur}))},null,2);
+      expenses:exps.map(e=>({...e,
+        categoryName:cat(e.category).name,
+        subcategoryName:e.subcategory?getSub(e.subcategory)?.name||'':null,
+        cardName:e.cardId?getCard(e.cardId)?.name||'':null,currency:cur}))},null,2);
   } else {
     const total=exps.reduce((s,e)=>s+e.amount,0);
     const cm={};exps.forEach(e=>{const cn=cat(e.category).name;cm[cn]=(cm[cn]||0)+e.amount;});
@@ -2139,7 +3032,8 @@ function buildExport(exps,m,y,type) {
     t+=`\nTRANSACTIONS:\n${'-'.repeat(38)}\n`;
     exps.forEach(e=>{
       const cn=e.cardId?getCard(e.cardId)?.name:null;
-      t+=`[${e.date}] ${e.description}\n  ${cat(e.category).name} | ${sym}${e.amount.toFixed(2)} | ${e.paymentType}${cn?' ('+cn+')':''}${e.notes?'\n  Note: '+e.notes:''}\n\n`;
+      const sn=e.subcategory?getSub(e.subcategory)?.name:null;
+      t+=`[${e.date}] ${e.description}\n  ${cat(e.category).name}${sn?' > '+sn:''} | ${sym}${e.amount.toFixed(2)} | ${e.paymentType}${cn?' ('+cn+')':''}${e.notes?'\n  Note: '+e.notes:''}\n\n`;
     });
     return t;
   }
@@ -2159,40 +3053,131 @@ function doExport(type) {
 
 // ── SETTINGS ───────────────────────────────────
 function renderSettings() {
-  document.getElementById('currencySelect').value=S.settings.currency;
-  const sym=CUR[S.settings.currency]||'₹';
-  document.getElementById('currencyDesc').textContent=`${document.getElementById('currencySelect').selectedOptions[0]?.text||'INR'} (${sym})`;
-  document.getElementById('notifToggle').classList.toggle('on',!!S.settings.notif);
+  document.getElementById('currencySelect').value = S.settings.currency;
+  const sym = CUR[S.settings.currency]||'₹';
+  document.getElementById('currencyDesc').textContent =
+    `${document.getElementById('currencySelect').selectedOptions[0]?.text||'INR'} (${sym})`;
+  const notifOn = !!S.settings.notif;
+  document.getElementById('notifToggle').classList.toggle('on', notifOn);
+  document.getElementById('reminderTimeRow').style.display = notifOn ? 'flex' : 'none';
+  const h = String(S.settings.reminderHour ?? 21).padStart(2,'0');
+  const min = String(S.settings.reminderMinute ?? 0).padStart(2,'0');
+  document.getElementById('reminderTimeInput').value = `${h}:${min}`;
+  // Category mode
+  const detailed = isDetailed();
+  document.getElementById('catModeToggle').classList.toggle('on', detailed);
+  document.getElementById('catModeDesc').textContent = detailed
+    ? 'Detailed — main + optional sub-category'
+    : 'Simple — one tap, main category only';
 }
+function toggleCatMode() {
+  S.settings.categoryMode = isDetailed() ? 'simple' : 'detailed';
+  persist(); renderSettings();
+  toast(isDetailed() ? 'Detailed mode on' : 'Simple mode on', 'ok');
+}
+
 function saveCurrency() {
-  S.settings.currency=document.getElementById('currencySelect').value;
+  S.settings.currency = document.getElementById('currencySelect').value;
   persist(); renderSettings(); toast('Currency updated','ok');
 }
+
+function saveReminderTime() {
+  const val = document.getElementById('reminderTimeInput').value; // "HH:MM"
+  if (!val) return;
+  const [h, m] = val.split(':').map(Number);
+  S.settings.reminderHour   = h;
+  S.settings.reminderMinute = m;
+  persist();
+  toast(`Reminder set for ${formatTime(h, m)}`,'ok');
+}
+
+function formatTime(h, m) {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 || 12;
+  return `${hh}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
 function toggleNotif() {
-  if(!S.settings.notif) {
-    Notification.requestPermission().then(async p=>{
-      if(p==='granted'){
-        S.settings.notif=true; persist(); renderSettings(); toast('Reminders on','ok');
-        scheduleNotif();
-        // Also wire up SW-based reminder
-        if('serviceWorker' in navigator) {
-          const reg = await navigator.serviceWorker.getRegistration();
-          if(reg) schedulePushReminder(reg);
-        }
-      } else toast('Permission denied','err');
+  if (!S.settings.notif) {
+    if (!('Notification' in window)) { toast('Notifications not supported','err'); return; }
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') {
+        S.settings.notif = true;
+        // Set default reminder time if not set
+        if (S.settings.reminderHour == null) { S.settings.reminderHour = 21; S.settings.reminderMinute = 0; }
+        persist(); renderSettings();
+        toast(`Reminders on — fires at ${formatTime(S.settings.reminderHour, S.settings.reminderMinute??0)}`,'ok');
+        checkAndFireReminder();
+      } else {
+        toast('Permission denied by browser','err');
+      }
     });
-  } else { S.settings.notif=false; persist(); renderSettings(); toast('Reminders off'); }
+  } else {
+    S.settings.notif = false;
+    persist(); renderSettings();
+    toast('Reminders off');
+  }
 }
-function scheduleNotif() {
-  if(!S.settings.notif||Notification.permission!=='granted') return;
-  const today=new Date().toISOString().slice(0,10);
-  if(!S.expenses.some(e=>e.date===today))
-    new Notification('Spendwise',{body:"Don't forget to log today's expenses! 💰"});
+
+// ── NOTIFICATION LOGIC ─────────────────────────
+// Called on every app open and after toggling reminder on.
+// Shows notification immediately if:
+//   1. Reminders enabled + permission granted
+//   2. Past the reminder time today
+//   3. No expenses logged today yet
+//   4. Haven't already notified today
+function checkAndFireReminder() {
+  if (!S.settings.notif) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const now        = new Date();
+  const today      = now.toISOString().slice(0,10);
+  const remHour    = S.settings.reminderHour   ?? 21;
+  const remMinute  = S.settings.reminderMinute ?? 0;
+
+  // Already notified today? Don't double-fire
+  const lastFired = localStorage.getItem('sw2_last_notif');
+  if (lastFired === today) return;
+
+  // Past reminder time today?
+  const isPastReminderTime = now.getHours() > remHour ||
+    (now.getHours() === remHour && now.getMinutes() >= remMinute);
+  if (!isPastReminderTime) return;
+
+  // Already logged today?
+  const loggedToday = S.expenses.some(e => e.date === today);
+  if (loggedToday) return;
+
+  // Fire!
+  const notif = new Notification('Spendwise 💰', {
+    body: "Don't forget to log today's expenses!",
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    tag: 'daily-reminder',
+    requireInteraction: false,
+  });
+
+  notif.onclick = () => { window.focus(); notif.close(); };
+  localStorage.setItem('sw2_last_notif', today);
 }
-function clearData() {
+
+// Also check in-page reminder banner (separate from push)
+async function clearData() {
   if(!confirm('Delete ALL data? Cannot be undone.')) return;
-  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; persist();
-  hideSubPage(); switchNav('home'); toast('Data cleared');
+
+  // Wipe all app data from localStorage (keep sw2_seeded so sample data never returns)
+  localStorage.removeItem('sw2');
+  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; S.smsQueue=[]; S.customSubs={};
+  persist();
+
+  // Tell SW to drop its cache so the fresh page loads from network on next open
+  if('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  }
+
+  hideSubPage(); switchNav('home');
+  toast('All data cleared','ok');
 }
 
 // ── SHEET UTILS ────────────────────────────────
@@ -2219,11 +3204,6 @@ async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   try {
     const reg = await navigator.serviceWorker.register('sw.js');
-    // Once SW controls the page, schedule daily reminder if enabled
-    if (S.settings.notif && Notification.permission === 'granted') {
-      schedulePushReminder(reg);
-    }
-    // Listen for messages from SW (e.g. SW activated)
     navigator.serviceWorker.addEventListener('message', e => {
       if (e.data && e.data.type === 'SW_READY') console.log('Spendwise SW ready');
     });
@@ -2232,50 +3212,37 @@ async function registerSW() {
   }
 }
 
-async function schedulePushReminder(reg) {
-  // Store last-entry date in SW scope so it can decide whether to notify
-  const today = new Date().toISOString().slice(0,10);
-  const lastEntry = S.expenses.length
-    ? [...S.expenses].sort((a,b)=>b.date.localeCompare(a.date))[0].date
-    : null;
-  if (reg && reg.active) {
-    reg.active.postMessage({
-      type: 'SCHEDULE_REMINDER',
-      lastEntry,
-      today,
-      reminderHour: S.settings.reminderHour ?? 21  // 9pm default
-    });
-  }
-}
-
 // ── INIT ───────────────────────────────────────
 (function init() {
   load();
   updateMonthLabel();
 
-  // Sample data if empty
-  if(S.expenses.length===0) {
+  // Seed sample data ONLY on first ever launch (never after a clear)
+  // 'sw2_seeded' flag is stored separately so clearData() doesn't touch it
+  const everSeeded = localStorage.getItem('sw2_seeded');
+  if (!everSeeded && S.expenses.length === 0) {
     const y=S.year, m=S.month;
     const pad=n=>String(n).padStart(2,'0');
     [
-      [1,'Dinner at restaurant',850,'food','UPI','Friends outing'],
-      [3,'Metro recharge',200,'transport','UPI',''],
-      [5,'Grocery shopping',1250,'food','Debit Card','Weekly'],
-      [7,'Electricity bill',1800,'bills','Net Banking','Monthly'],
-      [9,'Movie tickets',600,'entertainment','Credit Card','Weekend'],
-      [11,'Cab ride',320,'transport','UPI',''],
-      [14,'Online course',2999,'education','Credit Card','React'],
-      [16,'Pharmacy',450,'health','Cash','Medicines'],
-      [18,'Coffee & snacks',380,'food','UPI',''],
-      [20,'Gym membership',1200,'health','Credit Card','Monthly'],
+      [1, 'Dinner at restaurant',  850,  'food',          'UPI',         'Friends outing'],
+      [3, 'Metro recharge',        200,  'transport',     'UPI',         ''],
+      [5, 'Grocery shopping',      1250, 'food',          'Debit Card',  'Weekly'],
+      [7, 'Electricity bill',      1800, 'bills',         'Net Banking', 'Monthly'],
+      [9, 'Movie tickets',         600,  'entertainment', 'Credit Card', 'Weekend'],
+      [11,'Cab ride',              320,  'transport',     'UPI',         ''],
+      [14,'Online course',         2999, 'education',     'Credit Card', 'React'],
+      [16,'Pharmacy',              450,  'medical',       'Cash',        'Medicines'],
+      [18,'Coffee & snacks',       380,  'food',          'UPI',         ''],
+      [20,'Gym membership',        1200, 'fitness',       'Credit Card', 'Monthly'],
     ].forEach(([d,desc,amt,catId,pay,notes])=>{
       S.expenses.push({id:uid(),description:desc,amount:amt,date:`${y}-${pad(m+1)}-${pad(d)}`,category:catId,paymentType:pay,notes,createdAt:new Date().toISOString()});
     });
     persist();
+    localStorage.setItem('sw2_seeded', '1');
   }
 
   renderHome();
-  if(S.settings.notif) scheduleNotif();
+  checkAndFireReminder();
   registerSW();
   updateSmsBadge();
   handleShareTarget();
