@@ -519,6 +519,36 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
 .divider { height: 1px; background: var(--border); margin: 12px 0; }
+/* ─── AUTOCOMPLETE ───────────────────────────── */
+.ac-wrap { position: relative; }
+.ac-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--rsm);
+  box-shadow: var(--sh2);
+  z-index: 300;
+  overflow: hidden;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.ac-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--surface-3);
+  transition: background .1s;
+}
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover, .ac-item.focused { background: var(--primary-light); }
+.ac-item-main {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.ac-item-desc { font-size: 14px; font-weight: 500; color: var(--ink); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-item-amt { font-size: 13px; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--ink-2); flex-shrink: 0; }
+.ac-item-meta { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.ac-match { color: var(--primary); font-weight: 700; }
+
 .text-link { color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; }
 </style>
 </head>
@@ -837,7 +867,12 @@ body {
     <div class="sheet-body">
       <div class="form-group">
         <label class="form-label">Description *</label>
-        <input type="text" class="form-input" id="fDesc" placeholder="What did you spend on?" autocomplete="off">
+        <div class="ac-wrap">
+          <input type="text" class="form-input" id="fDesc" placeholder="What did you spend on?"
+            autocomplete="off" oninput="onDescInput()" onkeydown="onDescKey(event)"
+            onfocus="onDescInput()" onblur="hideAcDropdown()">
+          <div class="ac-dropdown" id="acDropdown" style="display:none"></div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group" style="margin:0">
@@ -852,7 +887,7 @@ body {
           <input type="date" class="form-input" id="fDate">
         </div>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-top:8px">
         <label class="form-label">Category</label>
         <div class="chips-wrap" id="catChips"></div>
       </div>
@@ -1026,6 +1061,23 @@ body {
       <button class="btn btn-ghost" onclick="closeSheet('cardSheet')">Cancel</button>
       <button class="btn btn-primary" onclick="saveCard()" id="saveCardBtn">Add Card</button>
     </div>
+  </div>
+</div>
+
+<!-- ITEM INSIGHT SHEET -->
+<div class="overlay" id="itemInsightSheet">
+  <div class="sheet" style="max-height:92vh">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <div style="flex:1;min-width:0">
+        <div id="insightTitle" style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <div id="insightSubtitle" style="font-size:11px;color:var(--ink-3);margin-top:2px"></div>
+      </div>
+      <button class="sheet-close" onclick="closeSheet('itemInsightSheet')">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+    <div style="overflow-y:auto;padding:16px 20px 24px" id="insightBody"></div>
   </div>
 </div>
 
@@ -1383,7 +1435,8 @@ function renderHome() {
 // ── LIST ───────────────────────────────────────
 function renderList() {
   const exps = moExp(S.month, S.year);
-  const search = document.getElementById('searchInput')?.value.toLowerCase()||'';
+  const search = document.getElementById('searchInput')?.value.trim()||'';
+  const searchLower = search.toLowerCase();
 
   // filter chips
   const catCounts = {};
@@ -1395,7 +1448,7 @@ function renderList() {
 
   let filtered = exps.filter(e=>{
     const c=cat(e.category);
-    const ms = !search || e.description.toLowerCase().includes(search)||(e.notes||'').toLowerCase().includes(search)||c.name.toLowerCase().includes(search);
+    const ms = !searchLower || e.description.toLowerCase().includes(searchLower)||(e.notes||'').toLowerCase().includes(searchLower)||c.name.toLowerCase().includes(searchLower);
     const mc = !S.filterCat || e.category===S.filterCat;
     return ms && mc;
   }).sort((a,b)=>b.date.localeCompare(a.date));
@@ -1423,12 +1476,157 @@ function renderList() {
 
 function setCatFilter(id) { S.filterCat=id; renderList(); }
 
+// ── ITEM INSIGHT ────────────────────────────────
+function openItemInsight(desc) {
+  const sym = CUR[S.settings.currency]||'₹';
+
+  // Find all expenses matching this exact description (case-insensitive)
+  const all = S.expenses
+    .filter(e=>e.description.toLowerCase()===desc.toLowerCase())
+    .sort((a,b)=>b.date.localeCompare(a.date));
+
+  if (!all.length) return;
+
+  const total    = all.reduce((s,e)=>s+e.amount,0);
+  const count    = all.length;
+  const avg      = total/count;
+  const latest   = all[0];
+  const oldest   = all[all.length-1];
+
+  // Price trend — last 3 vs first 3
+  const chrono   = [...all].sort((a,b)=>a.date.localeCompare(b.date));
+  const first3avg = chrono.slice(0,Math.min(3,count)).reduce((s,e)=>s+e.amount,0)/Math.min(3,count);
+  const last3avg  = chrono.slice(-Math.min(3,count)).reduce((s,e)=>s+e.amount,0)/Math.min(3,count);
+  const priceTrend = count>=2 ? ((last3avg-first3avg)/first3avg*100).toFixed(0) : null;
+  const trendUp    = priceTrend!==null && parseFloat(priceTrend)>5;
+  const trendDown  = priceTrend!==null && parseFloat(priceTrend)<-5;
+
+  // Monthly breakdown — bar chart
+  const monthMap = {};
+  all.forEach(e=>{
+    const key = e.date.slice(0,7);
+    if (!monthMap[key]) monthMap[key]={label:MONTHS[parseInt(e.date.slice(5,7))-1]+' '+e.date.slice(0,4),total:0,count:0};
+    monthMap[key].total+=e.amount;
+    monthMap[key].count++;
+  });
+  const monthEntries = Object.entries(monthMap).sort((a,b)=>a[0].localeCompare(b[0]));
+  const monthMax = Math.max(...monthEntries.map(([,v])=>v.total),1);
+
+  // Category — most used
+  const catMap={};
+  all.forEach(e=>{catMap[e.category]=(catMap[e.category]||0)+1;});
+  const topCatId = Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a])[0];
+  const topC = cat(topCatId);
+
+  // Set header
+  document.getElementById('insightTitle').textContent = desc;
+  document.getElementById('insightSubtitle').textContent = `${count} purchase${count!==1?'s':''} · ${fmt(total)} total`;
+
+  // Build body
+  document.getElementById('insightBody').innerHTML = `
+    <!-- Stat cards -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="stat-card" style="--accent:var(--primary)">
+        <div class="stat-label">Total Spent</div>
+        <div class="stat-val">${fmt(total)}</div>
+        <div class="stat-sub">${count} purchase${count!==1?'s':''}</div>
+      </div>
+      <div class="stat-card" style="--accent:var(--yellow)">
+        <div class="stat-label">Avg Price</div>
+        <div class="stat-val">${fmt(avg)}</div>
+        <div class="stat-sub">per purchase</div>
+      </div>
+      <div class="stat-card" style="--accent:${trendUp?'var(--red)':trendDown?'var(--green)':'var(--ink-3)'}">
+        <div class="stat-label">Price Trend</div>
+        <div class="stat-val" style="font-size:18px">${priceTrend!==null?(trendUp?'📈':'📉')+(parseFloat(priceTrend)>0?'+':'')+priceTrend+'%':'—'}</div>
+        <div class="stat-sub">${priceTrend!==null?(trendUp?'Getting pricier':trendDown?'Getting cheaper':'Stable price'):'Need 2+ purchases'}</div>
+      </div>
+      <div class="stat-card" style="--accent:var(--green)">
+        <div class="stat-label">Category</div>
+        <div class="stat-val" style="font-size:16px;margin-top:3px">${topC.emoji} ${topC.name.split(' ')[0]}</div>
+        <div class="stat-sub">most used</div>
+      </div>
+    </div>
+
+    <!-- Monthly bar chart -->
+    ${monthEntries.length>1?`
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head">
+        <span class="card-title">Monthly Spend</span>
+        <span style="font-size:11px;color:var(--ink-3)">${monthEntries.length} months</span>
+      </div>
+      <div class="card-body">
+        <div class="bar-list">
+          ${monthEntries.map(([,mv])=>`
+            <div class="bar-row">
+              <div class="bar-lbl">${mv.label}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${(mv.total/monthMax*100).toFixed(1)}%;background:var(--primary)">
+                  ${(mv.total/monthMax*100)>25?`<span>${mv.count}×</span>`:''}
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;min-width:80px">
+                <div class="bar-amt" style="margin:0">${fmt(mv.total)}</div>
+                <div style="font-size:10px;color:var(--ink-3)">${mv.count}×</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`:''}
+
+    <!-- First & last purchase -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><span class="card-title">Purchase History</span></div>
+      <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">First Purchase</div>
+          <div style="font-size:14px;font-weight:600">${fmt(oldest.amount)}</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:2px">${new Date(oldest.date+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Last Purchase</div>
+          <div style="font-size:14px;font-weight:600">${fmt(latest.amount)}</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:2px">${new Date(latest.date+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- All purchases list -->
+    <div class="card">
+      <div class="card-head"><span class="card-title">All Purchases</span></div>
+      <div class="card-body">
+        ${all.map(e=>{
+          const c=cat(e.category);
+          return `<div class="exp-item" style="border-bottom:1px solid var(--surface-3);padding:10px 0">
+            <div class="exp-icon" style="background:rgba(${rgb(c.color)},.13);width:36px;height:36px;border-radius:10px;font-size:16px">${c.emoji}</div>
+            <div class="exp-info">
+              <div class="exp-name" style="font-size:13px">${new Date(e.date+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+              <div class="exp-meta">${c.name} · ${e.paymentType}${e.notes?' · '+e.notes:''}</div>
+            </div>
+            <div class="exp-amt">${fmt(e.amount)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  // Open sheet
+  openSheet('itemInsightSheet');
+}
+
+function closeItemInsight() {
+  closeSheet('itemInsightSheet');
+}
+
 function expItem(e, actions=false) {
   const c=cat(e.category);
   const sub = e.subcategory ? getSub(e.subcategory) : null;
   const cardInfo = (e.paymentType==='Credit Card' && e.cardId) ? getCard(e.cardId) : null;
   const payLabel = cardInfo ? `${e.paymentType} · ${cardInfo.name}${cardInfo.last4?' ••'+cardInfo.last4:''}` : e.paymentType;
   const catLabel = sub ? `${c.name} › ${sub.emoji} ${sub.name}` : c.name;
+  const descEsc = e.description.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  // Only show insight icon if 2+ purchases of this description exist across all time
+  const insightCount = S.expenses.filter(x=>x.description.toLowerCase()===e.description.toLowerCase()).length;
+  const showInsight = actions && insightCount >= 2;
   return `<div class="exp-item" id="ei-${e.id}">
     <div class="exp-icon" style="background:rgba(${rgb(c.color)},.13)">${sub?sub.emoji:c.emoji}</div>
     <div class="exp-info">
@@ -1438,6 +1636,9 @@ function expItem(e, actions=false) {
     <div class="exp-right">
       <div class="exp-amt">${fmt(e.amount)}</div>
       ${actions?`<div class="exp-actions">
+        ${showInsight?`<button onclick="openItemInsight('${descEsc}')" title="View all '${descEsc}' expenses" style="color:var(--primary)">
+          <span class="material-icons-round">insights</span>
+        </button>`:''}
         <button onclick="editExp('${e.id}')" title="Edit"><span class="material-icons-round">edit</span></button>
         <button class="del" onclick="delExp('${e.id}')" title="Delete"><span class="material-icons-round">delete</span></button>
       </div>`:''}
@@ -3048,6 +3249,201 @@ function delCard(id) {
   persist(); renderCardsList(); toast('Card removed');
 }
 
+// ── AUTOCOMPLETE ───────────────────────────────
+let _acIndex = -1; // keyboard nav index
+
+// Build suggestion index from all past expenses
+// Returns array of {desc, category, subcategory, paymentType, cardId, amount, count, lastDate}
+function buildSuggestions(query) {
+  if (!query || query.length < 1) return [];
+  const q = query.toLowerCase().trim();
+
+  // Group by normalised description
+  const map = {};
+  S.expenses.forEach(e => {
+    const key = e.description.toLowerCase().trim();
+    if (!map[key]) {
+      map[key] = {
+        desc: e.description,
+        category: e.category,
+        subcategory: e.subcategory||null,
+        paymentType: e.paymentType,
+        cardId: e.cardId||null,
+        amounts: [],
+        lastDate: e.date,
+        count: 0
+      };
+    }
+    map[key].amounts.push(e.amount);
+    map[key].count++;
+    if (e.date > map[key].lastDate) {
+      // Update with most recent usage
+      map[key].lastDate    = e.date;
+      map[key].category    = e.category;
+      map[key].subcategory = e.subcategory||null;
+      map[key].paymentType = e.paymentType;
+      map[key].cardId      = e.cardId||null;
+    }
+  });
+
+  // Compute avg amount per description
+  const entries = Object.values(map).map(e => ({
+    ...e,
+    avgAmt: e.amounts.reduce((s,a)=>s+a,0) / e.amounts.length,
+    lastAmt: e.amounts[e.amounts.length-1]
+  }));
+
+  // Filter and rank
+  // Starts-with gets priority, then contains
+  const startsWith = entries.filter(e => e.desc.toLowerCase().startsWith(q));
+  const contains   = entries.filter(e => !e.desc.toLowerCase().startsWith(q) && e.desc.toLowerCase().includes(q));
+
+  // Sort each group by recency then frequency
+  const rank = arr => arr.sort((a,b) => {
+    if (b.lastDate !== a.lastDate) return b.lastDate.localeCompare(a.lastDate);
+    return b.count - a.count;
+  });
+
+  return [...rank(startsWith), ...rank(contains)].slice(0, 6);
+}
+
+function highlightMatch(text, query) {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return text.slice(0,idx) +
+    `<span class="ac-match">${text.slice(idx, idx+query.length)}</span>` +
+    text.slice(idx+query.length);
+}
+
+function onDescInput() {
+  const q = document.getElementById('fDesc').value;
+  const suggs = buildSuggestions(q);
+  _acIndex = -1;
+  renderAcDropdown(suggs, q);
+}
+
+function renderAcDropdown(suggs, q) {
+  const dd = document.getElementById('acDropdown');
+  if (!suggs.length) { dd.style.display='none'; return; }
+  const sym = CUR[S.settings.currency]||'₹';
+
+  dd.innerHTML = suggs.map((s,i) => {
+    const c = cat(s.category);
+    const sub = s.subcategory ? getSub(s.subcategory) : null;
+    const catLabel = sub ? `${c.emoji} ${c.name} › ${sub.emoji} ${sub.name}` : `${c.emoji} ${c.name}`;
+    const lastAmt = s.lastAmt;
+    return `<div class="ac-item" data-idx="${i}"
+      onmousedown="applyAcSugg(${i})"
+      onmouseover="setAcFocus(${i})">
+      <div class="ac-item-main">
+        <div class="ac-item-desc">${highlightMatch(s.desc, q)}</div>
+        <div class="ac-item-amt">${sym}${Math.round(lastAmt).toLocaleString('en-IN')}</div>
+      </div>
+      <div class="ac-item-meta">${catLabel} · ${s.paymentType} · ${s.count}×</div>
+    </div>`;
+  }).join('');
+
+  dd._suggs = suggs; // store for keyboard nav
+  dd.style.display = 'block';
+}
+
+function setAcFocus(idx) {
+  _acIndex = idx;
+  document.querySelectorAll('.ac-item').forEach((el,i) => {
+    el.classList.toggle('focused', i===idx);
+  });
+}
+
+function onDescKey(e) {
+  const dd = document.getElementById('acDropdown');
+  if (dd.style.display==='none') return;
+  const suggs = dd._suggs||[];
+  if (e.key==='ArrowDown') {
+    e.preventDefault();
+    setAcFocus(Math.min(_acIndex+1, suggs.length-1));
+  } else if (e.key==='ArrowUp') {
+    e.preventDefault();
+    setAcFocus(Math.max(_acIndex-1, 0));
+  } else if (e.key==='Enter' && _acIndex>=0) {
+    e.preventDefault();
+    applyAcSugg(_acIndex);
+  } else if (e.key==='Escape') {
+    dd.style.display='none';
+  }
+}
+
+function applyAcSugg(idx) {
+  const dd = document.getElementById('acDropdown');
+  const suggs = dd._suggs||[];
+  const s = suggs[idx];
+  if (!s) return;
+
+  // Fill description
+  document.getElementById('fDesc').value = s.desc;
+  dd.style.display='none';
+
+  // Pre-fill amount as hint — set value but show hint label
+  const amtEl = document.getElementById('fAmt');
+  amtEl.value = s.lastAmt;
+  amtEl.style.color = 'var(--ink-3)';
+  amtEl.title = `Last paid: ${fmt(s.lastAmt)} · Avg: ${fmt(s.avgAmt)}`;
+  // When user edits amount → restore color AND remove hint
+  amtEl.oninput = () => {
+    amtEl.style.color='var(--ink)';
+    clearAcHint();
+    amtEl.oninput=null;
+  };
+
+  // Pre-fill category + sub
+  renderCatChips(s.category, s.subcategory||null);
+
+  // Pre-fill payment type
+  document.getElementById('fPayment').value = s.paymentType;
+  onPaymentChange();
+
+  // Pre-fill card if applicable
+  if (s.paymentType==='Credit Card' && s.cardId && S.cards.length>0) {
+    setTimeout(()=>renderCardChips(s.cardId), 50);
+  }
+
+  // Show hint about what was pre-filled
+  showAcHint(s);
+}
+
+function showAcHint(s) {
+  // Remove any existing hint
+  const existing = document.getElementById('acHint');
+  if (existing) existing.remove();
+
+  const sym = CUR[S.settings.currency]||'₹';
+  const hint = document.createElement('div');
+  hint.id = 'acHint';
+  hint.style.cssText = `
+    font-size:11px;color:var(--ink-3);margin-top:6px;
+    padding:6px 10px;background:var(--surface-3);
+    border-radius:var(--rsm);display:flex;align-items:center;gap:6px;
+  `;
+  hint.innerHTML = `
+    <span class="material-icons-round" style="font-size:13px;color:var(--primary)">auto_fix_high</span>
+    Pre-filled from last use · last: ${sym}${Math.round(s.lastAmt).toLocaleString('en-IN')} · avg: ${sym}${Math.round(s.avgAmt).toLocaleString('en-IN')} · ${s.count}×
+    <span onclick="clearAcHint()" style="margin-left:auto;cursor:pointer;color:var(--ink-3)">✕</span>
+  `;
+  // Insert below amount row
+  const amtEl = document.getElementById('fAmt');
+  amtEl.closest('.form-row').after(hint);
+}
+
+function clearAcHint() {
+  document.getElementById('acHint')?.remove();
+  document.getElementById('fAmt').style.color = 'var(--ink)';
+}
+
+function hideAcDropdown() {
+  // Delay so mousedown on item fires first
+  setTimeout(()=>{ document.getElementById('acDropdown').style.display='none'; }, 150);
+}
+
 // ── ADD / EDIT EXPENSE ─────────────────────────
 function onPaymentChange() {
   const pay = document.getElementById('fPayment').value;
@@ -3084,12 +3480,15 @@ function openAddSheet(date) {
   document.getElementById('saveExpBtn').textContent='Add';
   document.getElementById('fDesc').value='';
   document.getElementById('fAmt').value='';
+  document.getElementById('fAmt').style.color='var(--ink)';
   document.getElementById('fDate').value=date||new Date().toISOString().slice(0,10);
   document.getElementById('fPayment').value='UPI';
   document.getElementById('fNotes').value='';
   document.getElementById('amtSym').textContent=CUR[S.settings.currency]||'₹';
   document.getElementById('cardPickerGroup').style.display='none';
   document.getElementById('subCatGroup').style.display='none';
+  document.getElementById('acDropdown').style.display='none';
+  document.getElementById('acHint')?.remove();
   renderCatChips(null, null);
   openSheet('expSheet');
   setTimeout(()=>document.getElementById('fDesc').focus(),300);
@@ -3101,10 +3500,13 @@ function editExp(id) {
   document.getElementById('saveExpBtn').textContent='Save';
   document.getElementById('fDesc').value=e.description;
   document.getElementById('fAmt').value=e.amount;
+  document.getElementById('fAmt').style.color='var(--ink)';
   document.getElementById('fDate').value=e.date;
   document.getElementById('fPayment').value=e.paymentType;
   document.getElementById('fNotes').value=e.notes||'';
   document.getElementById('amtSym').textContent=CUR[S.settings.currency]||'₹';
+  document.getElementById('acDropdown').style.display='none';
+  document.getElementById('acHint')?.remove();
   renderCatChips(e.category, e.subcategory||null);
   if(e.paymentType==='Credit Card' && S.cards.length>0) {
     document.getElementById('cardPickerGroup').style.display='block';

@@ -1,7 +1,7 @@
 // ── Spendwise Service Worker ──────────────────────────────────────────────────
 // Handles: offline caching + notification click
 // Bump SW_VERSION on every redeploy to force cache refresh
-const SW_VERSION = 'spendwise-v2';
+const SW_VERSION = 'spendwise-v3';
 const CACHE_NAME = SW_VERSION;
 
 const PRECACHE = [
