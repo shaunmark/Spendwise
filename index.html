@@ -581,7 +581,40 @@ body {
       <div><strong>Reminder!</strong> No expenses logged <span id="reminderMsg">today</span>.</div>
       <span class="material-icons-round reminder-close" onclick="this.closest('.reminder').style.display='none'">close</span>
     </div>
+    <!-- Income nudge — shows once if income not set -->
+    <div id="incomeNudge" style="display:none;background:#e8f0fe;border-left:4px solid var(--primary);
+      border-radius:var(--rsm);padding:11px 14px;margin-bottom:14px;
+      display:none;align-items:flex-start;gap:10px;font-size:13px">
+      <span class="material-icons-round" style="color:var(--primary);font-size:18px;flex-shrink:0;margin-top:1px">tips_and_updates</span>
+      <div style="flex:1">
+        <strong style="color:var(--primary-dark)">Set your monthly income</strong>
+        <div style="color:#3c4043;margin-top:2px;line-height:1.5">
+          Unlock income allocation — see exactly how much of your income is spent, invested, and remaining.
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button class="btn btn-primary" style="padding:6px 14px;font-size:12px"
+            onclick="dismissIncomeNudge(true)">
+            Set Income
+          </button>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px"
+            onclick="dismissIncomeNudge(false)">
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Income allocation — only shows if income set -->
+    <div id="incomeAllocationCard" style="display:none;margin-bottom:14px"></div>
     <div class="stat-strip" id="statStrip"></div>
+    <!-- Quick actions -->
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openAddSheet()">
+        <span class="material-icons-round">add</span> Add Expense
+      </button>
+      <button class="btn btn-outlined" style="flex:1;justify-content:center;border-color:var(--green);color:var(--green)" onclick="openInvSheet()">
+        <span class="material-icons-round">trending_up</span> Add Investment
+      </button>
+    </div>
     <div class="card">
       <div class="card-head">
         <span class="card-title">By Category</span>
@@ -636,6 +669,10 @@ body {
   <!-- ── MORE (Categories + Export + Settings) ── -->
   <div class="page" id="page-more">
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+      <button class="btn btn-ghost btn-full" style="justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:var(--r)" onclick="showSubPage('investments')">
+        <span class="material-icons-round" style="color:#43a047">trending_up</span> Investments
+        <span class="material-icons-round" style="margin-left:auto;color:var(--ink-3)">chevron_right</span>
+      </button>
       <button class="btn btn-ghost btn-full" style="justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:var(--r)" onclick="showSubPage('sms')">
         <span class="material-icons-round" style="color:#00897b">sms</span> SMS Import
         <span id="smsBadge" style="display:none;margin-left:4px;background:var(--red);color:white;border-radius:10px;font-size:11px;font-weight:700;padding:2px 7px"></span>
@@ -657,6 +694,18 @@ body {
         <span class="material-icons-round" style="color:var(--ink-2)">settings</span> Settings
         <span class="material-icons-round" style="margin-left:auto;color:var(--ink-3)">chevron_right</span>
       </button>
+    </div>
+
+    <!-- INVESTMENTS SUBPAGE -->
+    <div id="sub-investments" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn-icon-round" onclick="hideSubPage()"><span class="material-icons-round">arrow_back</span></button>
+        <span style="font-size:16px;font-weight:700">Investments</span>
+        <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px" onclick="openInvSheet()">
+          <span class="material-icons-round">add</span> Add
+        </button>
+      </div>
+      <div id="invBody"></div>
     </div>
 
     <!-- SMS IMPORT SUBPAGE -->
@@ -807,6 +856,19 @@ body {
             style="width:110px;font-size:14px;padding:8px 10px"
             onchange="saveReminderTime()">
         </div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <h4>Monthly Income</h4>
+            <p>Used to show invest/spend ratio in Investments</p>
+          </div>
+          <div class="input-wrap" style="width:130px">
+            <span class="input-prefix-sym" id="incomeSymLabel">₹</span>
+            <input type="number" class="form-input" id="incomeInput"
+              style="padding:8px 10px 8px 28px;font-size:14px"
+              placeholder="Optional" min="0" inputmode="decimal"
+              onchange="saveIncome()">
+          </div>
+        </div>
       </div>
       <div class="settings-section">
         <div class="settings-label">Data</div>
@@ -858,13 +920,13 @@ body {
 
 <!-- ADD/EDIT SHEET -->
 <div class="overlay" id="expSheet">
-  <div class="sheet">
+  <div class="sheet" style="max-height:92vh">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
       <span class="sheet-title" id="sheetTitle">Add Expense</span>
       <button class="sheet-close" onclick="closeSheet('expSheet')"><span class="material-icons-round">close</span></button>
     </div>
-    <div class="sheet-body">
+    <div class="sheet-body" style="overflow-y:auto;max-height:calc(92vh - 130px)">
       <div class="form-group">
         <label class="form-label">Description *</label>
         <div class="ac-wrap">
@@ -891,6 +953,27 @@ body {
         <label class="form-label">Category</label>
         <div class="chips-wrap" id="catChips"></div>
       </div>
+      <!-- Savings nudge — shown when Savings category selected -->
+      <div id="savingsNudge" style="display:none;margin-top:8px;
+        background:#e8f5e9;border-left:3px solid var(--green);
+        border-radius:var(--rsm);padding:10px 12px">
+        <div style="font-size:12px;color:#2e7d32;font-weight:600;margin-bottom:6px">
+          💡 Savings works better in Investments
+        </div>
+        <div style="font-size:11px;color:#388e3c;margin-bottom:10px;line-height:1.5">
+          Tracking this as an investment keeps your expense analytics clean and lets you see invest vs spend ratios.
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" style="flex:1;padding:8px;font-size:12px;background:var(--green);color:white;border-radius:var(--rsm)"
+            onclick="switchToInvestment()">
+            <span class="material-icons-round" style="font-size:14px">trending_up</span> Add as Investment
+          </button>
+          <button class="btn btn-ghost" style="padding:8px 12px;font-size:12px;border-radius:var(--rsm)"
+            onclick="document.getElementById('savingsNudge').style.display='none'">
+            Keep as expense
+          </button>
+        </div>
+      </div>
       <div class="form-group" id="subCatGroup" style="display:none">
         <label class="form-label">Sub-category <span style="color:var(--ink-3);font-weight:400;font-size:10px">(optional)</span></label>
         <div class="chips-wrap" id="subCatChips"></div>
@@ -909,6 +992,25 @@ body {
       <div class="form-group">
         <label class="form-label">Notes</label>
         <input type="text" class="form-input" id="fNotes" placeholder="Optional note…" autocomplete="off">
+      </div>
+      <!-- Exclude from analytics -->
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        padding:12px 14px;background:var(--surface-3);border-radius:var(--rsm);margin-top:4px">
+        <div>
+          <div style="font-size:13px;font-weight:500">Exclude from analytics</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:2px">Investments, reimbursables, anomalies</div>
+        </div>
+        <div class="toggle" id="fExcludeToggle" onclick="toggleExclude()"></div>
+      </div>
+      <div id="fExcludeReasonRow" style="display:none;margin-top:8px">
+        <label class="form-label">Reason</label>
+        <select class="form-input form-select" id="fExcludeReason">
+          <option value="investment">Investment / Saving</option>
+          <option value="reimbursable">Reimbursable</option>
+          <option value="anomaly">One-time anomaly</option>
+          <option value="late">Late entry</option>
+          <option value="other">Other</option>
+        </select>
       </div>
     </div>
     <div class="sheet-footer">
@@ -1081,6 +1183,78 @@ body {
   </div>
 </div>
 
+<!-- INVESTMENT SHEET -->
+<div class="overlay" id="invSheet">
+  <div class="sheet" style="max-height:92vh">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="invSheetTitle">Add Investment</span>
+      <button class="sheet-close" onclick="closeSheet('invSheet')"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="sheet-body" style="overflow-y:auto;max-height:calc(92vh - 130px)">
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <div class="chips-wrap" id="invTypeChips"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Label</label>
+        <input type="text" class="form-input" id="invLabel"
+          placeholder="e.g. HDFC Mid Cap SIP, SBI FD" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Amount *</label>
+          <div class="input-wrap">
+            <span class="input-prefix-sym" id="invAmtSym">₹</span>
+            <input type="number" class="form-input" id="invAmt"
+              placeholder="0" min="0" step="0.01" inputmode="decimal">
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Date *</label>
+          <input type="date" class="form-input" id="invDate">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="form-input" id="invNotes"
+          placeholder="Optional note…" autocomplete="off">
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="closeSheet('invSheet')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveInv()" id="saveInvBtn">Add Investment</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVINGS MIGRATION SHEET -->
+<div class="overlay" id="migrationSheet">
+  <div class="sheet" style="max-width:480px">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Move Savings to Investments?</span>
+    </div>
+    <div class="sheet-body">
+      <div style="background:var(--primary-light);border-radius:var(--rsm);padding:14px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
+        <span class="material-icons-round" style="color:var(--primary);font-size:22px;flex-shrink:0">info</span>
+        <div style="font-size:13px;color:var(--ink-2);line-height:1.6">
+          We found expenses under <strong>Savings</strong> category. These are investments, not expenses — moving them gives you cleaner spend analytics.
+        </div>
+      </div>
+      <div id="migrationList" style="margin-bottom:16px"></div>
+      <div style="font-size:12px;color:var(--ink-3);line-height:1.6">
+        Moved items will appear in <strong>Investments</strong> and be excluded from expense analytics.
+      </div>
+    </div>
+    <div class="sheet-footer" style="flex-direction:column;gap:8px">
+      <button class="btn btn-primary btn-full" onclick="doMigration('all')">Move All to Investments</button>
+      <button class="btn btn-outlined btn-full" onclick="doMigration('review')">Review Each</button>
+      <button class="btn btn-text btn-full" onclick="doMigration('keep')">Keep as Expenses</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast-container" id="toastWrap"></div>
 
@@ -1089,15 +1263,18 @@ body {
 const S = {
   expenses: [],
   categories: [],
-  customSubs: {},      // {parentId: [{id, name, emoji, desc}]} — user-added subs
+  customSubs: {},
   cards: [],
   smsQueue: [],
-  settings: { currency: 'INR', notif: false, categoryMode: 'simple' },
+  investments: [],     // {id, amount, type, label, date, notes, createdAt}
+  settings: { currency: 'INR', notif: false, categoryMode: 'simple', income: null },
   month: new Date().getMonth(),
   year:  new Date().getFullYear(),
   editId: null,
   filterCat: '',
-  activeSmsId: null
+  activeSmsId: null,
+  includeExcluded: false,   // analytics toggle
+  migrationDone: false      // savings migration shown flag
 };
 
 const CUR = { INR:'₹', USD:'$', EUR:'€', GBP:'£', JPY:'¥', AUD:'A$', CAD:'C$', SGD:'S$', AED:'د.إ' };
@@ -1223,21 +1400,22 @@ function load() {
 
   let d;
   try { d = JSON.parse(raw); } catch(e) {
-    console.error('Spendwise: corrupt localStorage, resetting categories only', e);
+    console.error('Spendwise: corrupt localStorage', e);
     S.categories = [...DEFAULT_CATS]; return;
   }
 
-  // Restore all fields with safe fallbacks — never lose data
-  S.expenses   = Array.isArray(d.expenses)   ? d.expenses   : [];
-  S.categories = Array.isArray(d.categories) ? d.categories : [...DEFAULT_CATS];
-  S.customSubs = (d.customSubs && typeof d.customSubs==='object') ? d.customSubs : {};
-  S.cards      = Array.isArray(d.cards)      ? d.cards      : [];
-  S.smsQueue   = Array.isArray(d.smsQueue)   ? d.smsQueue   : [];
-  S.settings   = { ...S.settings, ...(d.settings||{}) };
+  S.expenses      = Array.isArray(d.expenses)     ? d.expenses     : [];
+  S.categories    = Array.isArray(d.categories)   ? d.categories   : [...DEFAULT_CATS];
+  S.customSubs    = (d.customSubs && typeof d.customSubs==='object') ? d.customSubs : {};
+  S.cards         = Array.isArray(d.cards)         ? d.cards        : [];
+  S.smsQueue      = Array.isArray(d.smsQueue)      ? d.smsQueue     : [];
+  S.investments   = Array.isArray(d.investments)   ? d.investments  : [];
+  // migrationV2 = savings migration. Use versioned key so old buggy 'migrationDone' doesn't block it.
+  S.migrationDone = !!d.migrationV2;
+  S.settings      = { ...S.settings, ...(d.settings||{}) };
 
-  // ── Migration: rename old 'health' → 'medical' ──
-  // Run in its own try so a migration bug never wipes restored data
   try {
+    // health → medical rename
     S.expenses.forEach(e => { if(e.category==='health') e.category='medical'; });
     const hIdx = S.categories.findIndex(c=>c.id==='health');
     if(hIdx>-1) {
@@ -1245,26 +1423,38 @@ function load() {
       S.categories[hIdx].name='Medical & Health';
       S.categories[hIdx].emoji='🏥';
     }
-
+    // Add missing default categories
     const savedIds = new Set(S.categories.map(c=>c.id));
     let migrated = false;
     DEFAULT_CATS.forEach(dc => {
       if(!savedIds.has(dc.id)) { S.categories.push({...dc}); migrated=true; }
     });
-
     if(migrated || hIdx>-1) persist();
   } catch(e) {
     console.error('Spendwise: migration error (data preserved)', e);
-    // Data is already loaded above — migration failed but cards/expenses are safe
   }
 }
+
 function persist() {
   localStorage.setItem('sw2', JSON.stringify({
     expenses: S.expenses, categories: S.categories,
     customSubs: S.customSubs, cards: S.cards,
-    smsQueue: S.smsQueue, settings: S.settings
+    smsQueue: S.smsQueue, investments: S.investments,
+    migrationV2: S.migrationDone, settings: S.settings
   }));
 }
+
+// Investment types
+const INV_TYPES = [
+  {id:'sip',   name:'SIP / Mutual Fund', emoji:'📈'},
+  {id:'fd',    name:'Fixed Deposit',     emoji:'🏦'},
+  {id:'stocks',name:'Stocks / Equity',   emoji:'📊'},
+  {id:'ppf',   name:'PPF / NPS',         emoji:'🔐'},
+  {id:'gold',  name:'Gold',              emoji:'🪙'},
+  {id:'realestate',name:'Real Estate',   emoji:'🏘️'},
+  {id:'other', name:'Other',             emoji:'💼'},
+];
+function invType(id) { return INV_TYPES.find(t=>t.id===id)||INV_TYPES[INV_TYPES.length-1]; }
 
 // ── SUB-CATEGORY HELPERS ───────────────────────
 // Get all subs for a parent (default + custom)
@@ -1280,7 +1470,14 @@ function isDetailed() { return S.settings.categoryMode === 'detailed'; }
 // ── HELPERS ────────────────────────────────────
 function fmt(n) { return (CUR[S.settings.currency]||'₹') + Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function cat(id) { return S.categories.find(c=>c.id===id) || {name:'Other',emoji:'📦',color:'#607d8b'}; }
-function moExp(m,y) { return S.expenses.filter(e=>{ const d=new Date(e.date); return d.getMonth()===m&&d.getFullYear()===y; }); }
+function moExp(m,y) {
+  return S.expenses.filter(e=>{
+    const d=new Date(e.date);
+    if(d.getMonth()!==m||d.getFullYear()!==y) return false;
+    if(!S.includeExcluded && e.excluded) return false;
+    return true;
+  });
+}
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function rgb(hex) { return [parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)].join(','); }
 function dateLabel(dt) { return new Date(dt+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',weekday:'short'}); }
@@ -1318,11 +1515,12 @@ function showSubPage(id) {
   document.querySelectorAll('[id^="sub-"]').forEach(el=>el.style.display='none');
   document.querySelector('#page-more > div:first-child').style.display='none';
   document.getElementById('sub-'+id).style.display='block';
-  if (id==='categories') renderCatList();
-  if (id==='export') initExport();
-  if (id==='settings') renderSettings();
-  if (id==='cards') renderCardsList();
-  if (id==='sms') renderSmsPage();
+  if (id==='categories')  renderCatList();
+  if (id==='export')      initExport();
+  if (id==='settings')    renderSettings();
+  if (id==='cards')       renderCardsList();
+  if (id==='sms')         renderSmsPage();
+  if (id==='investments') renderInvestments();
 }
 function hideSubPage() {
   document.querySelectorAll('[id^="sub-"]').forEach(el=>el.style.display='none');
@@ -1354,6 +1552,7 @@ function checkReminder() {
 // ── HOME ───────────────────────────────────────
 function renderHome() {
   checkReminder();
+  checkIncomeNudge();
   const exps = moExp(S.month, S.year);
   const total = exps.reduce((s,e)=>s+e.amount,0);
   const sym = CUR[S.settings.currency]||'₹';
@@ -1363,12 +1562,108 @@ function renderHome() {
   const days = new Set(exps.map(e=>e.date)).size;
   const avg = days ? (total/days) : 0;
 
+  // investments this month
+  const moInv = S.investments.filter(i=>{
+    const d=new Date(i.date+'T00:00');
+    return d.getMonth()===S.month&&d.getFullYear()===S.year;
+  });
+  const invTotal = moInv.reduce((s,i)=>s+i.amount,0);
+
+  // For income allocation: include ALL expenses except investment/reimbursable excluded ones
+  // One-time anomaly, late entry, other excluded = still real spend from income
+  const allMonthExps = S.expenses.filter(e=>{
+    const d=new Date(e.date); return d.getMonth()===S.month&&d.getFullYear()===S.year;
+  });
+  const realSpend = allMonthExps
+    .filter(e => !e.excluded || !['investment','reimbursable'].includes(e.excludeReason))
+    .reduce((s,e)=>s+e.amount,0);
+
   // top cat
   const catMap = {};
   exps.forEach(e=>{ catMap[e.category]=(catMap[e.category]||0)+e.amount; });
   const topId = Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a])[0];
   const topC = topId ? cat(topId) : null;
 
+  // ── Income allocation card (only if income set) ──
+  const income = S.settings.income;
+  const allocationCard = document.getElementById('incomeAllocationCard');
+  if (income) {
+    const totalOut   = realSpend + invTotal;
+    const isOver     = totalOut > income;
+    const remaining  = Math.max(income - totalOut, 0);
+    const overAmount = Math.max(totalOut - income, 0);
+
+    // Bar segments — cap so never exceeds 100% total
+    // If overspent, proportionally scale down to fit in 100%
+    const barTotal   = Math.max(totalOut, income);
+    const spentBar   = (realSpend / barTotal * 100).toFixed(1);
+    const invBar     = (invTotal  / barTotal * 100).toFixed(1);
+    const remBar     = (remaining / barTotal * 100).toFixed(1);
+
+    // Label percentages — always show actual vs income (can exceed 100%)
+    const spentPctLabel = (realSpend/income*100).toFixed(0);
+    const invPctLabel   = (invTotal/income*100).toFixed(0);
+    const remPctLabel   = (remaining/income*100).toFixed(0);
+
+    // Savings rate — clamp at 0 if overspent
+    const savingsRate = isOver ? Math.max(((invTotal+remaining)/income*100),0).toFixed(0)
+                                : ((invTotal+remaining)/income*100).toFixed(0);
+
+    allocationCard.style.display='block';
+    allocationCard.innerHTML=`
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Income Allocation</span>
+          <span style="font-size:11px;color:var(--ink-3)">${sym}${Number(income).toLocaleString('en-IN')}/mo</span>
+        </div>
+        <div class="card-body">
+          ${isOver ? `
+          <div style="background:#fce8e6;border-left:3px solid var(--red);border-radius:var(--rsm);
+            padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;font-size:12px">
+            <span class="material-icons-round" style="font-size:16px;color:var(--red);flex-shrink:0">warning</span>
+            <span style="color:#c62828;font-weight:600">Over income by ${fmt(overAmount)} this month</span>
+          </div>` : ''}
+          <!-- Allocation bar -->
+          <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin-bottom:10px">
+            <div style="flex:${spentBar};background:var(--red);min-width:${realSpend>0?4:0}px;border-radius:7px 0 0 7px;transition:flex .5s"></div>
+            <div style="flex:${invBar};background:var(--green);min-width:${invTotal>0?4:0}px;transition:flex .5s"></div>
+            <div style="flex:${remBar};background:#e8f5e9;min-width:${remaining>0?4:0}px;border-radius:0 7px 7px 0;transition:flex .5s"></div>
+          </div>
+          <!-- Three columns -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+            <div>
+              <div style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace;color:var(--red)">${spentPctLabel}%</div>
+              <div style="font-size:10px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px">Cash Out</div>
+              <div style="font-size:11px;color:var(--ink-2);margin-top:1px">${fmt(realSpend)}</div>
+            </div>
+            <div style="border-left:1px solid var(--border);border-right:1px solid var(--border)">
+              <div style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace;color:var(--green)">${invPctLabel}%</div>
+              <div style="font-size:10px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px">Invested</div>
+              <div style="font-size:11px;color:var(--ink-2);margin-top:1px">${fmt(invTotal)}</div>
+            </div>
+            <div>
+              <div style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace;color:${isOver?'var(--red)':'#43a047'}">${isOver?'0':remPctLabel}%</div>
+              <div style="font-size:10px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px">Remaining</div>
+              <div style="font-size:11px;color:${isOver?'var(--red)':'var(--ink-2)'};margin-top:1px">${isOver?'–'+fmt(overAmount):fmt(remaining)}</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:10px;color:var(--ink-3);text-align:center">
+            Cash Out = all outflows except investments &amp; reimbursables
+          </div>
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);
+            display:flex;align-items:center;justify-content:space-between;font-size:12px">
+            <span style="color:var(--ink-3)">Savings rate this month</span>
+            <span style="font-weight:700;color:${savingsRate>=20?'var(--green)':savingsRate>=10?'var(--yellow)':'var(--red)'}">
+              ${isOver?'–'+Math.abs((totalOut-income)/income*100).toFixed(0):savingsRate}%
+            </span>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    allocationCard.style.display='none';
+  }
+
+  // ── Stat cards — add invested if any investments this month ──
   document.getElementById('statStrip').innerHTML = `
     <div class="stat-card" style="--accent:var(--primary)">
       <div class="stat-label">Total Spent</div>
@@ -1376,9 +1671,9 @@ function renderHome() {
       <div class="stat-sub">${diff!==null?(diff>0?'▲':'▼')+Math.abs(diff)+'% vs last month':'This month'}</div>
     </div>
     <div class="stat-card" style="--accent:var(--green)">
-      <div class="stat-label">Transactions</div>
-      <div class="stat-val">${exps.length}</div>
-      <div class="stat-sub">${days} active day${days!==1?'s':''}</div>
+      <div class="stat-label">${invTotal>0?'Invested':'Transactions'}</div>
+      <div class="stat-val">${invTotal>0?sym+Math.round(invTotal).toLocaleString('en-IN'):exps.length}</div>
+      <div class="stat-sub">${invTotal>0?moInv.length+' investment'+(moInv.length!==1?'s':''):days+' active day'+(days!==1?'s':'')}</div>
     </div>
     <div class="stat-card" style="--accent:var(--yellow)">
       <div class="stat-label">Avg / Day</div>
@@ -1434,30 +1729,37 @@ function renderHome() {
 
 // ── LIST ───────────────────────────────────────
 function renderList() {
-  const exps = moExp(S.month, S.year);
+  const allMonthExps = S.expenses.filter(e=>{
+    const d=new Date(e.date); return d.getMonth()===S.month&&d.getFullYear()===S.year;
+  });
+  const excludedExps = allMonthExps.filter(e=>e.excluded);
   const search = document.getElementById('searchInput')?.value.trim()||'';
   const searchLower = search.toLowerCase();
 
-  // filter chips
+  // filter chips — from non-excluded only
+  const activeExps = allMonthExps.filter(e=>!e.excluded);
   const catCounts = {};
-  exps.forEach(e=>{ catCounts[e.category]=(catCounts[e.category]||0)+1; });
+  activeExps.forEach(e=>{ catCounts[e.category]=(catCounts[e.category]||0)+1; });
   const usedCats = S.categories.filter(c=>catCounts[c.id]);
   document.getElementById('catFilters').innerHTML =
     `<div class="filter-chip ${!S.filterCat?'sel':''}" onclick="setCatFilter('')">All</div>` +
     usedCats.map(c=>`<div class="filter-chip ${S.filterCat===c.id?'sel':''}" onclick="setCatFilter('${c.id}')">${c.emoji} ${c.name}</div>`).join('');
 
-  let filtered = exps.filter(e=>{
+  const baseExps = S.includeExcluded ? allMonthExps : activeExps;
+  let filtered = baseExps.filter(e=>{
     const c=cat(e.category);
     const ms = !searchLower || e.description.toLowerCase().includes(searchLower)||(e.notes||'').toLowerCase().includes(searchLower)||c.name.toLowerCase().includes(searchLower);
     const mc = !S.filterCat || e.category===S.filterCat;
     return ms && mc;
   }).sort((a,b)=>b.date.localeCompare(a.date));
 
-  const total = filtered.reduce((s,e)=>s+e.amount,0);
-  document.getElementById('listTitle').textContent = `${MONTHS[S.month]} ${S.year} · ${fmt(total)}`;
-  document.getElementById('listBadge').textContent = filtered.length+' item'+(filtered.length!==1?'s':'');
+  const total = filtered.filter(e=>!e.excluded).reduce((s,e)=>s+e.amount,0);
+  const exclTotal = excludedExps.reduce((s,e)=>s+e.amount,0);
 
-  if (!filtered.length) {
+  document.getElementById('listTitle').textContent = `${MONTHS[S.month]} ${S.year} · ${fmt(total)}`;
+  document.getElementById('listBadge').textContent = filtered.filter(e=>!e.excluded).length+' items';
+
+  if (!filtered.length && !excludedExps.length) {
     document.getElementById('listBody').innerHTML = '<div class="empty"><span class="material-icons-round">search_off</span><p>No results</p></div>';
     return;
   }
@@ -1467,10 +1769,34 @@ function renderList() {
   filtered.forEach(e=>{ (groups[e.date]=groups[e.date]||[]).push(e); });
   let html='';
   Object.keys(groups).sort((a,b)=>b.localeCompare(a)).forEach(d=>{
-    const dayTotal = groups[d].reduce((s,e)=>s+e.amount,0);
+    const dayTotal = groups[d].filter(e=>!e.excluded).reduce((s,e)=>s+e.amount,0);
     html+=`<div class="date-header">${dateLabel(d)} <span style="float:right;font-weight:400">${fmt(dayTotal)}</span></div>`;
     html+=groups[d].map(e=>expItem(e,true)).join('');
   });
+
+  // Excluded section at bottom
+  if(excludedExps.length) {
+    const exclLabel = S.includeExcluded
+      ? `Showing all (incl. ${excludedExps.length} excluded · ${fmt(exclTotal)})`
+      : `${excludedExps.length} excluded · ${fmt(exclTotal)}`;
+    html+=`<div style="margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;cursor:pointer"
+        onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.exc-chevron').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(180deg)'">
+        <span style="font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.5px">${exclLabel}</span>
+        <span class="material-icons-round exc-chevron" style="font-size:16px;color:var(--ink-3);transition:transform .2s">expand_more</span>
+      </div>
+      <div style="display:none">
+        ${excludedExps.map(e=>expItem(e,true)).join('')}
+        <div style="font-size:11px;color:var(--ink-3);text-align:center;padding:10px 0;display:flex;justify-content:center;gap:16px">
+          <span onclick="S.includeExcluded=!S.includeExcluded;renderList()"
+            style="cursor:pointer;color:var(--primary);font-weight:600">
+            ${S.includeExcluded ? '✓ Included in totals — tap to exclude' : 'Include in totals'}
+          </span>
+        </div>
+      </div>
+    </div>`;
+  }
+
   document.getElementById('listBody').innerHTML = html;
 }
 
@@ -1624,23 +1950,26 @@ function expItem(e, actions=false) {
   const payLabel = cardInfo ? `${e.paymentType} · ${cardInfo.name}${cardInfo.last4?' ••'+cardInfo.last4:''}` : e.paymentType;
   const catLabel = sub ? `${c.name} › ${sub.emoji} ${sub.name}` : c.name;
   const descEsc = e.description.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-  // Only show insight icon if 2+ purchases of this description exist across all time
   const insightCount = S.expenses.filter(x=>x.description.toLowerCase()===e.description.toLowerCase()).length;
   const showInsight = actions && insightCount >= 2;
-  return `<div class="exp-item" id="ei-${e.id}">
+  const REASON_LABELS = {investment:'Investment',reimbursable:'Reimbursable',anomaly:'Anomaly',late:'Late entry',other:'Excluded'};
+  const isExcl = !!e.excluded;
+  return `<div class="exp-item" id="ei-${e.id}" style="${isExcl?'opacity:.55':''}">
     <div class="exp-icon" style="background:rgba(${rgb(c.color)},.13)">${sub?sub.emoji:c.emoji}</div>
     <div class="exp-info">
-      <div class="exp-name">${e.description}</div>
-      <div class="exp-meta">${catLabel} · ${payLabel}${e.notes?' · '+e.notes:''}</div>
+      <div class="exp-name" style="${isExcl?'text-decoration:line-through':''}">${e.description}</div>
+      <div class="exp-meta">${catLabel} · ${payLabel}${e.notes?' · '+e.notes:''}
+        ${isExcl?`<span style="background:#f1f3f4;color:var(--ink-3);border-radius:8px;padding:1px 6px;font-size:10px;font-weight:600;margin-left:4px">${REASON_LABELS[e.excludeReason]||'Excluded'}</span>`:''}
+      </div>
     </div>
     <div class="exp-right">
-      <div class="exp-amt">${fmt(e.amount)}</div>
+      <div class="exp-amt" style="${isExcl?'text-decoration:line-through;color:var(--ink-3)':''}">${fmt(e.amount)}</div>
       ${actions?`<div class="exp-actions">
-        ${showInsight?`<button onclick="openItemInsight('${descEsc}')" title="View all '${descEsc}' expenses" style="color:var(--primary)">
+        ${showInsight?`<button onclick="openItemInsight('${descEsc}')" style="color:var(--primary)">
           <span class="material-icons-round">insights</span>
         </button>`:''}
-        <button onclick="editExp('${e.id}')" title="Edit"><span class="material-icons-round">edit</span></button>
-        <button class="del" onclick="delExp('${e.id}')" title="Delete"><span class="material-icons-round">delete</span></button>
+        <button onclick="editExp('${e.id}')"><span class="material-icons-round">edit</span></button>
+        <button class="del" onclick="delExp('${e.id}')"><span class="material-icons-round">delete</span></button>
       </div>`:''}
     </div>
   </div>`;
@@ -2942,6 +3271,255 @@ function handleShareTarget() {
   toast('SMS added to queue','ok');
 }
 
+// ── INCOME NUDGE ───────────────────────────────
+function checkIncomeNudge() {
+  // Already dismissed or income already set — never show
+  if (localStorage.getItem('sw2_income_nudge_done')) return;
+  if (S.settings.income) { localStorage.setItem('sw2_income_nudge_done','1'); return; }
+  document.getElementById('incomeNudge').style.display='flex';
+}
+
+function dismissIncomeNudge(goToSettings) {
+  document.getElementById('incomeNudge').style.display='none';
+  localStorage.setItem('sw2_income_nudge_done','1');
+  if (goToSettings) { switchNav('more'); showSubPage('settings'); }
+}
+function renderInvestments() {
+  const sym = CUR[S.settings.currency]||'₹';
+  const moInv = S.investments.filter(i=>{
+    const d=new Date(i.date+'T00:00');
+    return d.getMonth()===S.month&&d.getFullYear()===S.year;
+  });
+  const allInv = S.investments;
+  const moTotal  = moInv.reduce((s,i)=>s+i.amount,0);
+  const allTotal = allInv.reduce((s,i)=>s+i.amount,0);
+
+  // Type breakdown this month
+  const typeMap={};
+  moInv.forEach(i=>{ typeMap[i.type]=(typeMap[i.type]||0)+i.amount; });
+  const typeSorted=Object.entries(typeMap).sort((a,b)=>b[1]-a[1]);
+  const typeMax=typeSorted[0]?.[1]||1;
+
+  // Monthly trend (last 6)
+  const trendRows=[];
+  for(let i=5;i>=0;i--){
+    let m=S.month-i,y=S.year; if(m<0){m+=12;y--;}
+    const tot=S.investments.filter(inv=>{const d=new Date(inv.date+'T00:00');return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,i)=>s+i.amount,0);
+    trendRows.push({label:MONTHS[m]+' '+y,total:tot,m,y});
+  }
+  const trendMax=Math.max(...trendRows.map(r=>r.total),1);
+
+  // Group investments by month
+  const grouped={};
+  [...S.investments].sort((a,b)=>b.date.localeCompare(a.date)).forEach(i=>{
+    const key=i.date.slice(0,7);
+    if(!grouped[key]) grouped[key]={label:FMONTHS[parseInt(i.date.slice(5,7))-1]+' '+i.date.slice(0,4),items:[],total:0};
+    grouped[key].items.push(i); grouped[key].total+=i.amount;
+  });
+
+  document.getElementById('invBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="stat-card" style="--accent:var(--green)">
+        <div class="stat-label">This Month</div>
+        <div class="stat-val" style="font-size:18px">${fmt(moTotal)}</div>
+        <div class="stat-sub">${moInv.length} investment${moInv.length!==1?'s':''}</div>
+      </div>
+      <div class="stat-card" style="--accent:var(--primary)">
+        <div class="stat-label">All Time</div>
+        <div class="stat-val" style="font-size:18px">${fmt(allTotal)}</div>
+        <div class="stat-sub">${allInv.length} total</div>
+      </div>
+    </div>
+    ${typeSorted.length?`
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><span class="card-title">By Type · ${MONTHS[S.month]}</span></div>
+      <div class="card-body"><div class="bar-list">
+        ${typeSorted.map(([type,amt])=>{
+          const t=invType(type);
+          return `<div class="bar-row">
+            <div class="bar-lbl">${t.emoji} ${t.name}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(amt/typeMax*100).toFixed(1)}%;background:var(--green)">
+              ${(amt/typeMax*100)>25?`<span>${moTotal?(amt/moTotal*100).toFixed(0):'0'}%</span>`:''}</div></div>
+            <div class="bar-amt">${fmt(amt)}</div>
+          </div>`;
+        }).join('')}
+      </div></div>
+    </div>`:''}
+    ${Object.keys(grouped).length?Object.entries(grouped).map(([,g])=>`
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-head">
+          <span class="card-title">${g.label}</span>
+          <span style="font-size:13px;font-weight:700;font-family:'DM Mono',monospace;color:var(--green)">${fmt(g.total)}</span>
+        </div>
+        <div class="card-body">
+          ${g.items.map(i=>{
+            const t=invType(i.type);
+            return `<div class="exp-item" style="border-bottom:1px solid var(--surface-3)">
+              <div class="exp-icon" style="background:#e8f5e9;font-size:20px">${t.emoji}</div>
+              <div class="exp-info">
+                <div class="exp-name">${i.label||t.name}</div>
+                <div class="exp-meta">${t.name} · ${new Date(i.date+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}${i.notes?' · '+i.notes:''}</div>
+              </div>
+              <div class="exp-right">
+                <div class="exp-amt" style="color:var(--green)">${fmt(i.amount)}</div>
+                <div class="exp-actions">
+                  <button onclick="delInv('${i.id}')" class="del"><span class="material-icons-round">delete</span></button>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`).join('')
+    :`<div class="empty"><span class="material-icons-round">trending_up</span><p>No investments logged yet.<br>Tap + to add your first.</p></div>`}`;
+}
+
+let _invEditId = null;
+function openInvSheet(editId) {
+  _invEditId = editId||null;
+  document.getElementById('invSheetTitle').textContent = editId?'Edit Investment':'Add Investment';
+  document.getElementById('saveInvBtn').textContent = editId?'Save':'Add Investment';
+  document.getElementById('invAmt').value='';
+  document.getElementById('invDate').value=new Date().toISOString().slice(0,10);
+  document.getElementById('invLabel').value='';
+  document.getElementById('invNotes').value='';
+  document.getElementById('invAmtSym').textContent=CUR[S.settings.currency]||'₹';
+  // Type chips
+  let selType = 'sip';
+  if (editId) {
+    const inv=S.investments.find(i=>i.id===editId);
+    if(inv){selType=inv.type;document.getElementById('invAmt').value=inv.amount;document.getElementById('invDate').value=inv.date;document.getElementById('invLabel').value=inv.label||'';document.getElementById('invNotes').value=inv.notes||'';}
+  }
+  document.getElementById('invTypeChips').innerHTML = INV_TYPES.map(t=>
+    `<div class="chip ${t.id===selType?'sel':''}" onclick="selInvType('${t.id}',this)" data-id="${t.id}">${t.emoji} ${t.name}</div>`
+  ).join('');
+  openSheet('invSheet');
+}
+function selInvType(id,el){
+  document.querySelectorAll('#invTypeChips .chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function getSelInvType(){return document.querySelector('#invTypeChips .chip.sel')?.dataset.id||'other';}
+function saveInv(){
+  const amt=parseFloat(document.getElementById('invAmt').value);
+  const date=document.getElementById('invDate').value;
+  const label=document.getElementById('invLabel').value.trim();
+  const notes=document.getElementById('invNotes').value.trim();
+  const type=getSelInvType();
+  if(!amt||amt<=0){toast('Enter valid amount','err');return;}
+  if(!date){toast('Pick a date','err');return;}
+  if(_invEditId){
+    const i=S.investments.findIndex(x=>x.id===_invEditId);
+    if(i>-1) S.investments[i]={...S.investments[i],type,label,amount:amt,date,notes};
+    toast('Updated','ok');
+  } else {
+    S.investments.push({id:uid(),type,label,amount:amt,date,notes,createdAt:new Date().toISOString()});
+    toast('Investment added ✓','ok');
+  }
+  persist(); closeSheet('invSheet'); renderInvestments();
+}
+function delInv(id){
+  S.investments=S.investments.filter(i=>i.id!==id);
+  persist(); renderInvestments(); renderHome(); toast('Investment deleted');
+}
+
+// ── EXCLUDE FROM ANALYTICS ─────────────────────
+function toggleExclude(){
+  const tog=document.getElementById('fExcludeToggle');
+  const row=document.getElementById('fExcludeReasonRow');
+  const isOn=tog.classList.toggle('on');
+  row.style.display=isOn?'block':'none';
+}
+
+// ── SAVINGS MIGRATION ──────────────────────────
+function checkMigration(){
+  if(S.migrationDone) return;
+  const savingsExps=S.expenses.filter(e=>e.category==='savings'&&!e.excluded);
+  // No savings expenses — nothing to migrate, but don't lock it out permanently
+  // Just return silently. migrationDone stays false so it checks again next time.
+  if(!savingsExps.length) return;
+  // Show migration sheet
+  const sym=CUR[S.settings.currency]||'₹';
+  const total=savingsExps.reduce((s,e)=>s+e.amount,0);
+  document.getElementById('migrationList').innerHTML=`
+    <div style="background:var(--surface-3);border-radius:var(--rsm);padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:22px;font-weight:700;font-family:'DM Mono',monospace;color:var(--primary);margin-bottom:4px">${fmt(total)}</div>
+      <div style="font-size:13px;color:var(--ink-2)">${savingsExps.length} expense${savingsExps.length!==1?'s':''} under Savings category</div>
+    </div>
+    ${savingsExps.slice(0,3).map(e=>`
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <span style="color:var(--ink-2)">${e.description||'—'}</span>
+        <span style="font-weight:600;font-family:'DM Mono',monospace">${fmt(e.amount)}</span>
+      </div>`).join('')}
+    ${savingsExps.length>3?`<div style="font-size:11px;color:var(--ink-3);padding-top:6px">+${savingsExps.length-3} more</div>`:''}`;
+  // Reset footer in case it was changed by review flow
+  const footer=document.querySelector('#migrationSheet .sheet-footer');
+  footer.innerHTML=`
+    <button class="btn btn-primary btn-full" onclick="doMigration('all')">Move All to Investments</button>
+    <button class="btn btn-outlined btn-full" onclick="doMigration('review')">Review Each</button>
+    <button class="btn btn-text btn-full" onclick="doMigration('keep')">Keep as Expenses</button>`;
+  openSheet('migrationSheet');
+}
+
+let _migrationReviewIdx = 0;
+function doMigration(action){
+  const savingsExps=S.expenses.filter(e=>e.category==='savings');
+  if(action==='all'){
+    // Convert all to investments
+    savingsExps.forEach(e=>{
+      S.investments.push({id:uid(),type:'other',label:e.description||'Savings',amount:e.amount,date:e.date,notes:e.notes||'',createdAt:new Date().toISOString()});
+    });
+    S.expenses=S.expenses.filter(e=>e.category!=='savings');
+    toast(`${savingsExps.length} item${savingsExps.length!==1?'s':''} moved to Investments`,'ok');
+  } else if(action==='keep'){
+    toast('Kept as expenses');
+  } else if(action==='review'){
+    // Review each — close migration sheet, open review flow
+    closeSheet('migrationSheet');
+    _migrationReviewIdx=0;
+    reviewNextMigration();
+    return;
+  }
+  S.migrationDone=true; persist();
+  closeSheet('migrationSheet');
+}
+
+function reviewNextMigration(){
+  const savingsExps=S.expenses.filter(e=>e.category==='savings');
+  if(_migrationReviewIdx>=savingsExps.length){
+    S.migrationDone=true; persist();
+    toast('Review complete','ok'); return;
+  }
+  const e=savingsExps[_migrationReviewIdx];
+  const sym=CUR[S.settings.currency]||'₹';
+  // Show a simple confirm toast-like sheet using existing sheet pattern
+  // Reuse migration sheet with single item
+  document.getElementById('migrationList').innerHTML=`
+    <div style="background:var(--surface-3);border-radius:var(--rsm);padding:14px;margin-bottom:8px">
+      <div style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace;color:var(--primary)">${fmt(e.amount)}</div>
+      <div style="font-size:14px;font-weight:500;margin-top:4px">${e.description||'—'}</div>
+      <div style="font-size:11px;color:var(--ink-3);margin-top:2px">${e.date}</div>
+    </div>
+    <div style="font-size:12px;color:var(--ink-3);text-align:center">${_migrationReviewIdx+1} of ${savingsExps.length}</div>`;
+  // Change footer buttons
+  const footer=document.querySelector('#migrationSheet .sheet-footer');
+  footer.innerHTML=`
+    <button class="btn btn-primary btn-full" onclick="reviewMigrationAction('move')">Move to Investments</button>
+    <button class="btn btn-ghost btn-full" onclick="reviewMigrationAction('keep')">Keep as Expense</button>`;
+  openSheet('migrationSheet');
+}
+
+function reviewMigrationAction(action){
+  const savingsExps=S.expenses.filter(e=>e.category==='savings');
+  const e=savingsExps[_migrationReviewIdx];
+  if(action==='move'&&e){
+    S.investments.push({id:uid(),type:'other',label:e.description||'Savings',amount:e.amount,date:e.date,notes:e.notes||'',createdAt:new Date().toISOString()});
+    S.expenses=S.expenses.filter(x=>x.id!==e.id);
+  }
+  _migrationReviewIdx++;
+  closeSheet('migrationSheet');
+  setTimeout(()=>reviewNextMigration(),300);
+}
+
 // ── CATEGORIES ─────────────────────────────────
 let expandedCatId = null; // which main cat is expanded in list
 
@@ -3489,6 +4067,9 @@ function openAddSheet(date) {
   document.getElementById('subCatGroup').style.display='none';
   document.getElementById('acDropdown').style.display='none';
   document.getElementById('acHint')?.remove();
+  document.getElementById('fExcludeToggle').classList.remove('on');
+  document.getElementById('fExcludeReasonRow').style.display='none';
+  document.getElementById('savingsNudge').style.display='none';
   renderCatChips(null, null);
   openSheet('expSheet');
   setTimeout(()=>document.getElementById('fDesc').focus(),300);
@@ -3507,6 +4088,13 @@ function editExp(id) {
   document.getElementById('amtSym').textContent=CUR[S.settings.currency]||'₹';
   document.getElementById('acDropdown').style.display='none';
   document.getElementById('acHint')?.remove();
+  // Exclude fields
+  const excTog=document.getElementById('fExcludeToggle');
+  const excRow=document.getElementById('fExcludeReasonRow');
+  excTog.classList.toggle('on',!!e.excluded);
+  excRow.style.display=e.excluded?'block':'none';
+  if(e.excluded&&e.excludeReason) document.getElementById('fExcludeReason').value=e.excludeReason;
+  document.getElementById('savingsNudge').style.display='none';
   renderCatChips(e.category, e.subcategory||null);
   if(e.paymentType==='Credit Card' && S.cards.length>0) {
     document.getElementById('cardPickerGroup').style.display='block';
@@ -3538,6 +4126,26 @@ function selCatChip(id,el) {
   el.classList.add('sel');
   if(isDetailed()) renderSubChips('subCatChips','subCatGroup',id,null);
   else document.getElementById('subCatGroup').style.display='none';
+  // Show savings nudge when savings category selected
+  document.getElementById('savingsNudge').style.display = id==='savings' ? 'block' : 'none';
+}
+
+function switchToInvestment() {
+  // Grab whatever the user already filled in the expense sheet
+  const amt  = document.getElementById('fAmt').value;
+  const date = document.getElementById('fDate').value;
+  const desc = document.getElementById('fDesc').value.trim();
+  const notes= document.getElementById('fNotes').value.trim();
+  // Close expense sheet
+  closeSheet('expSheet');
+  // Open investment sheet pre-filled
+  setTimeout(()=>{
+    openInvSheet(null);
+    if(amt)  document.getElementById('invAmt').value  = amt;
+    if(date) document.getElementById('invDate').value = date;
+    if(desc) document.getElementById('invLabel').value = desc;
+    if(notes)document.getElementById('invNotes').value = notes;
+  }, 300);
 }
 function selSubChip(id,containerId,el) {
   document.querySelectorAll(`#${containerId} .chip`).forEach(c=>c.classList.remove('sel'));
@@ -3561,12 +4169,14 @@ function saveExp() {
     cardId=getSelCard();
     if(!cardId){toast('Select a credit card','err');return;}
   }
+  const excluded = document.getElementById('fExcludeToggle').classList.contains('on');
+  const excludeReason = excluded ? document.getElementById('fExcludeReason').value : null;
   if(S.editId){
     const i=S.expenses.findIndex(e=>e.id===S.editId);
-    S.expenses[i]={...S.expenses[i],description:desc,amount:amt,date,category:catId,subcategory:subId,paymentType:payment,notes,cardId};
+    S.expenses[i]={...S.expenses[i],description:desc,amount:amt,date,category:catId,subcategory:subId,paymentType:payment,notes,cardId,excluded,excludeReason};
     toast('Updated','ok');
   } else {
-    S.expenses.push({id:uid(),description:desc,amount:amt,date,category:catId,subcategory:subId,paymentType:payment,notes,cardId,createdAt:new Date().toISOString()});
+    S.expenses.push({id:uid(),description:desc,amount:amt,date,category:catId,subcategory:subId,paymentType:payment,notes,cardId,excluded,excludeReason,createdAt:new Date().toISOString()});
     toast('Added ✓','ok');
   }
   persist(); closeSheet('expSheet'); refreshActive();
@@ -3575,7 +4185,7 @@ function delExp(id) {
   S.expenses=S.expenses.filter(e=>e.id!==id);
   persist();
   const el=document.getElementById('ei-'+id);
-  if(el){el.style.transition='.2s';el.style.opacity='0';el.style.transform='translateX(16px)';setTimeout(()=>el.remove(),200);}
+  if(el){el.style.transition='.2s';el.style.opacity='0';el.style.transform='translateX(16px)';setTimeout(()=>{ el.remove(); if(currentNav==='list') renderList(); },220);}
   renderHome(); toast('Deleted');
 }
 
@@ -3639,6 +4249,15 @@ function doExport(type) {
   a.click(); toast('Exported','ok');
 }
 
+function saveIncome() {
+  const val = parseFloat(document.getElementById('incomeInput').value);
+  S.settings.income = val>0 ? val : null;
+  persist();
+  if (S.settings.income) localStorage.setItem('sw2_income_nudge_done','1');
+  toast('Income updated','ok');
+  renderHome();
+}
+
 // ── SETTINGS ───────────────────────────────────
 function renderSettings() {
   document.getElementById('currencySelect').value = S.settings.currency;
@@ -3651,12 +4270,14 @@ function renderSettings() {
   const h = String(S.settings.reminderHour ?? 21).padStart(2,'0');
   const min = String(S.settings.reminderMinute ?? 0).padStart(2,'0');
   document.getElementById('reminderTimeInput').value = `${h}:${min}`;
-  // Category mode
   const detailed = isDetailed();
   document.getElementById('catModeToggle').classList.toggle('on', detailed);
   document.getElementById('catModeDesc').textContent = detailed
     ? 'Detailed — main + optional sub-category'
     : 'Simple — one tap, main category only';
+  // Income
+  document.getElementById('incomeSymLabel').textContent = sym;
+  document.getElementById('incomeInput').value = S.settings.income||'';
 }
 function toggleCatMode() {
   S.settings.categoryMode = isDetailed() ? 'simple' : 'detailed';
@@ -3755,7 +4376,7 @@ async function clearData() {
 
   // Wipe all app data from localStorage (keep sw2_seeded so sample data never returns)
   localStorage.removeItem('sw2');
-  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; S.smsQueue=[]; S.customSubs={};
+  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; S.smsQueue=[]; S.customSubs={}; S.investments=[]; S.migrationDone=false;
   persist();
 
   // Tell SW to drop its cache so the fresh page loads from network on next open
@@ -3834,6 +4455,8 @@ async function registerSW() {
   registerSW();
   updateSmsBadge();
   handleShareTarget();
+  // Check savings migration after short delay so UI renders first
+  setTimeout(checkMigration, 600);
 })();
 </script>
 </body>
