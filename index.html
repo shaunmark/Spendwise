@@ -605,6 +605,10 @@ body {
     </div>
     <!-- Income allocation — only shows if income set -->
     <div id="incomeAllocationCard" style="display:none;margin-bottom:14px"></div>
+    <!-- Recurring urgent banners (missed + due) -->
+    <div id="recurringPendingBanner" style="display:none;margin-bottom:14px"></div>
+    <!-- Advance warning indicator — tappable, opens sheet -->
+    <div id="advanceWarningIndicator" style="display:none;margin-bottom:14px"></div>
     <div class="stat-strip" id="statStrip"></div>
     <!-- Quick actions -->
     <div style="display:flex;gap:10px;margin-bottom:14px">
@@ -1022,7 +1026,7 @@ body {
 
 <!-- CATEGORY SHEET -->
 <div class="overlay" id="catSheet">
-  <div class="sheet" style="max-width:420px">
+  <div class="sheet" style="max-height:92vh">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
       <span class="sheet-title" id="catSheetTitle">New Category</span>
@@ -1132,7 +1136,7 @@ body {
 
 <!-- CREDIT CARD SHEET -->
 <div class="overlay" id="cardSheet">
-  <div class="sheet" style="max-width:420px">
+  <div class="sheet" style="max-height:92vh">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
       <span class="sheet-title" id="cardSheetTitle">Add Credit Card</span>
@@ -1220,6 +1224,39 @@ body {
         <input type="text" class="form-input" id="invNotes"
           placeholder="Optional note…" autocomplete="off">
       </div>
+      <!-- Recurring toggle -->
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        padding:12px 14px;background:var(--surface-3);border-radius:var(--rsm);margin-top:4px">
+        <div>
+          <div style="font-size:13px;font-weight:500">Recurring monthly</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:2px">Auto-remind every month</div>
+        </div>
+        <div class="toggle" id="invRecurringToggle" onclick="toggleInvRecurring()"></div>
+      </div>
+      <div id="invDayRow" style="display:none;margin-top:8px">
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Deduction day of month</label>
+          <input type="number" class="form-input" id="invDayOfMonth"
+            min="1" max="28" placeholder="e.g. 15" inputmode="numeric">
+          <div style="font-size:11px;color:var(--ink-3);margin-top:4px">Max 28 to work for all months</div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Remind me from</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px" id="invRemindChips">
+            <div class="chip sel" data-val="som" onclick="selRemindChip(this,'inv')">Start of month</div>
+            <div class="chip" data-val="7" onclick="selRemindChip(this,'inv')">1 week before</div>
+            <div class="chip" data-val="3" onclick="selRemindChip(this,'inv')">3 days before</div>
+            <div class="chip" data-val="0" onclick="selRemindChip(this,'inv')">On the day</div>
+            <div class="chip" data-val="custom" onclick="selRemindChip(this,'inv')">Custom</div>
+          </div>
+          <div id="invRemindCustomRow" style="display:none;margin-top:10px">
+            <label class="form-label">Remind from day</label>
+            <input type="number" class="form-input" id="invRemindCustomDay"
+              min="1" max="28" placeholder="e.g. 1" inputmode="numeric">
+            <div style="font-size:11px;color:var(--ink-3);margin-top:4px">Reminder shows from this day until deduction day</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="sheet-footer">
       <button class="btn btn-ghost" onclick="closeSheet('invSheet')">Cancel</button>
@@ -1230,7 +1267,7 @@ body {
 
 <!-- SAVINGS MIGRATION SHEET -->
 <div class="overlay" id="migrationSheet">
-  <div class="sheet" style="max-width:480px">
+  <div class="sheet" style="max-height:92vh">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
       <span class="sheet-title">Move Savings to Investments?</span>
@@ -1255,6 +1292,86 @@ body {
   </div>
 </div>
 
+<!-- RECURRING INVESTMENTS CONFIRM SHEET -->
+<div class="overlay" id="recurringConfirmSheet">
+  <div class="sheet" style="max-height:92vh">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Confirm Recurring Investments</span>
+      <button class="sheet-close" onclick="closeSheet('recurringConfirmSheet')">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+    <div class="sheet-body" style="overflow-y:auto;max-height:calc(92vh - 180px)" id="recurringConfirmBody"></div>
+    <div class="sheet-footer" style="flex-direction:column;gap:8px">
+      <button class="btn btn-primary btn-full" onclick="confirmAllRecurring()">
+        <span class="material-icons-round">done_all</span> Confirm All
+      </button>
+      <button class="btn btn-ghost btn-full" onclick="closeSheet('recurringConfirmSheet')">Later</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAKE RECURRING SHEET -->
+<div class="overlay" id="makeRecurringSheet">
+  <div class="sheet" style="max-height:92vh">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Make Recurring</span>
+      <button class="sheet-close" onclick="closeSheet('makeRecurringSheet')">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+    <div class="sheet-body" style="overflow-y:auto;max-height:calc(92vh - 130px)">
+      <div id="makeRecurringPreview" style="background:var(--surface-3);border-radius:var(--rsm);
+        padding:12px 14px;margin-bottom:16px"></div>
+      <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Deduction day of month *</label>
+          <input type="number" class="form-input" id="makeRecurringDay"
+            min="1" max="28" placeholder="e.g. 15" inputmode="numeric">
+          <div style="font-size:11px;color:var(--ink-3);margin-top:4px">Max 28</div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Remind me from</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px" id="makeRemindChips">
+            <div class="chip sel" data-val="som" onclick="selRemindChip(this,'make')">Start of month</div>
+            <div class="chip" data-val="7" onclick="selRemindChip(this,'make')">1 week before</div>
+            <div class="chip" data-val="3" onclick="selRemindChip(this,'make')">3 days before</div>
+            <div class="chip" data-val="0" onclick="selRemindChip(this,'make')">On the day</div>
+            <div class="chip" data-val="custom" onclick="selRemindChip(this,'make')">Custom</div>
+          </div>
+          <div id="makeRemindCustomRow" style="display:none;margin-top:10px">
+            <label class="form-label">Remind from day</label>
+            <input type="number" class="form-input" id="makeRemindCustomDay"
+              min="1" max="28" placeholder="e.g. 1" inputmode="numeric">
+            <div style="font-size:11px;color:var(--ink-3);margin-top:4px">Reminder shows from this day until deduction day</div>
+          </div>
+        </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" onclick="closeSheet('makeRecurringSheet')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMakeRecurring()">Set as Recurring</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECURRING ADVANCE WARNING SHEET -->
+<div class="overlay" id="advanceWarningSheet">
+  <div class="sheet" style="max-height:92vh">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Upcoming Investments</span>
+      <button class="sheet-close" onclick="closeSheet('advanceWarningSheet')">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+    <div class="sheet-body" style="overflow-y:auto;max-height:calc(92vh - 130px)" id="advanceWarningBody"></div>
+    <div class="sheet-footer">
+      <button class="btn btn-primary btn-full" onclick="closeSheet('advanceWarningSheet')">Got it</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast-container" id="toastWrap"></div>
 
@@ -1266,15 +1383,16 @@ const S = {
   customSubs: {},
   cards: [],
   smsQueue: [],
-  investments: [],     // {id, amount, type, label, date, notes, createdAt}
+  investments: [],      // {id, amount, type, label, date, notes, createdAt}
+  recurringInv: [],     // {id, type, label, amount, dayOfMonth, active, lastConfirmedMonth}
   settings: { currency: 'INR', notif: false, categoryMode: 'simple', income: null },
   month: new Date().getMonth(),
   year:  new Date().getFullYear(),
   editId: null,
   filterCat: '',
   activeSmsId: null,
-  includeExcluded: false,   // analytics toggle
-  migrationDone: false      // savings migration shown flag
+  includeExcluded: false,
+  migrationDone: false
 };
 
 const CUR = { INR:'₹', USD:'$', EUR:'€', GBP:'£', JPY:'¥', AUD:'A$', CAD:'C$', SGD:'S$', AED:'د.إ' };
@@ -1410,6 +1528,7 @@ function load() {
   S.cards         = Array.isArray(d.cards)         ? d.cards        : [];
   S.smsQueue      = Array.isArray(d.smsQueue)      ? d.smsQueue     : [];
   S.investments   = Array.isArray(d.investments)   ? d.investments  : [];
+  S.recurringInv  = Array.isArray(d.recurringInv)  ? d.recurringInv : [];
   // migrationV2 = savings migration. Use versioned key so old buggy 'migrationDone' doesn't block it.
   S.migrationDone = !!d.migrationV2;
   S.settings      = { ...S.settings, ...(d.settings||{}) };
@@ -1440,6 +1559,7 @@ function persist() {
     expenses: S.expenses, categories: S.categories,
     customSubs: S.customSubs, cards: S.cards,
     smsQueue: S.smsQueue, investments: S.investments,
+    recurringInv: S.recurringInv,
     migrationV2: S.migrationDone, settings: S.settings
   }));
 }
@@ -1553,6 +1673,7 @@ function checkReminder() {
 function renderHome() {
   checkReminder();
   checkIncomeNudge();
+  checkRecurringPending();
   const exps = moExp(S.month, S.year);
   const total = exps.reduce((s,e)=>s+e.amount,0);
   const sym = CUR[S.settings.currency]||'₹';
@@ -3271,6 +3392,437 @@ function handleShareTarget() {
   toast('SMS added to queue','ok');
 }
 
+// ── RECURRING INVESTMENTS ──────────────────────
+
+function currentMonthKey() {
+  return `${S.year}-${String(S.month+1).padStart(2,'0')}`;
+}
+
+// Get recurring investments pending for current month
+function getPendingRecurring() {
+  const key = currentMonthKey();
+  const today = new Date().getDate();
+  return S.recurringInv.filter(r => {
+    if (!r.active) return false;
+    if (r.lastConfirmedMonth === key) return false;
+    return today >= r.dayOfMonth;
+  });
+}
+
+// Upcoming: in remind window (before the date)
+function getUpcomingRecurring() {
+  const key = currentMonthKey();
+  const today = new Date().getDate();
+  return S.recurringInv.filter(r => {
+    if (!r.active) return false;
+    if (r.lastConfirmedMonth === key) return false;
+    // remindFromDay: the day of month from which to show the reminder
+    // fallback: remindDaysBefore (old format) or default 3 days before
+    const remindFrom = r.remindFromDay
+      ?? Math.max(r.dayOfMonth - (r.remindDaysBefore ?? 3), 1);
+    return today >= remindFrom && today < r.dayOfMonth;
+  });
+}
+
+// Get missed months for a recurring template
+// Returns array of YYYY-MM strings that were skipped
+function getMissedMonths(r) {
+  if (!r.lastConfirmedMonth) return [];
+  const missed = [];
+  let [y, m] = r.lastConfirmedMonth.split('-').map(Number);
+  const curKey = currentMonthKey();
+  // Walk forward from month after lastConfirmed up to (not including) current month
+  while (true) {
+    m++; if (m > 12) { m = 1; y++; }
+    const key = `${y}-${String(m).padStart(2,'0')}`;
+    if (key >= curKey) break; // stop before current month
+    missed.push(key);
+  }
+  return missed;
+}
+
+// Get all missed recurring items across all templates
+function getMissedRecurring() {
+  const missed = [];
+  S.recurringInv.filter(r=>r.active).forEach(r=>{
+    getMissedMonths(r).forEach(monthKey=>{
+      missed.push({r, monthKey,
+        label: FMONTHS[parseInt(monthKey.slice(5,7))-1]+' '+monthKey.slice(0,4)
+      });
+    });
+  });
+  return missed;
+}
+
+// Check and render missed + pending banners on home, advance warning as popup
+function checkRecurringPending() {
+  const banner    = document.getElementById('recurringPendingBanner');
+  const indicator = document.getElementById('advanceWarningIndicator');
+  if (!banner) return;
+
+  const pending  = getPendingRecurring();
+  const upcoming = getUpcomingRecurring();
+  const missed   = getMissedRecurring();
+
+  // ── Urgent inline banners (missed + due) ──
+  let html = '';
+
+  if (missed.length) {
+    const byMonth = {};
+    missed.forEach(m=>{ (byMonth[m.monthKey]=byMonth[m.monthKey]||{label:m.label,items:[]}).items.push(m); });
+    html += `<div style="background:#fff3e0;border-left:4px solid var(--yellow);border-radius:var(--rsm);
+      padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span class="material-icons-round" style="color:var(--yellow);font-size:20px;flex-shrink:0">warning</span>
+        <div style="font-size:13px;font-weight:700;color:#e65100">Missed recurring investments</div>
+      </div>
+      ${Object.entries(byMonth).map(([key,g])=>`
+        <div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+          <div style="font-size:11px;font-weight:700;color:#bf360c;margin-bottom:4px">${g.label}</div>
+          ${g.items.map(m=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+              <span style="font-size:12px;color:#5d4037">${m.r.label||invType(m.r.type).name}</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:12px;font-weight:600;font-family:'DM Mono',monospace">${fmt(m.r.amount)}</span>
+                <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px"
+                  onclick="logMissed('${m.r.id}','${key}')">Log</button>
+                <button style="background:none;border:none;font-size:11px;color:var(--ink-3);cursor:pointer;padding:3px"
+                  onclick="skipMissed('${m.r.id}','${key}')">Skip</button>
+              </div>
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>`;
+  }
+
+  if (pending.length) {
+    const total = pending.reduce((s,r)=>s+r.amount,0);
+    html += `<div style="background:#e8f5e9;border-left:4px solid var(--green);border-radius:var(--rsm);
+      padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer"
+      onclick="openRecurringConfirm()">
+      <span class="material-icons-round" style="color:var(--green);font-size:22px;flex-shrink:0">repeat</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:#1b5e20">
+          ${pending.length} recurring investment${pending.length!==1?'s':''} — log this month
+        </div>
+        <div style="font-size:11px;color:#388e3c;margin-top:2px">
+          ${fmt(total)} total · tap to record
+        </div>
+      </div>
+      <span class="material-icons-round" style="color:var(--green);font-size:18px">chevron_right</span>
+    </div>`;
+  }
+
+  if (html) { banner.style.display='block'; banner.innerHTML=html; }
+  else { banner.style.display='none'; }
+
+  // ── Advance warning — small indicator that opens a sheet ──
+  if (indicator) {
+    const today = new Date().toISOString().slice(0,10);
+    // Filter out ones dismissed today
+    const visibleUpcoming = upcoming.filter(r =>
+      !localStorage.getItem(`sw2_remind_dismissed_${r.id}_${today}`)
+    );
+    if (visibleUpcoming.length) {
+      const soonest = visibleUpcoming.reduce((a,b)=>a.dayOfMonth<b.dayOfMonth?a:b);
+      const daysLeft = soonest.dayOfMonth - new Date().getDate();
+      indicator.style.display='block';
+      indicator.innerHTML=`
+        <div onclick="openAdvanceWarning()"
+          style="background:var(--surface);border:1.5px solid #1e88e5;border-radius:var(--rsm);
+          padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer">
+          <span class="material-icons-round" style="color:#1e88e5;font-size:18px;flex-shrink:0">alarm</span>
+          <div style="flex:1;font-size:12px;color:#1565c0">
+            <strong>${visibleUpcoming.length} upcoming</strong> — 
+            ${soonest.label||invType(soonest.type).name} deducts in ${daysLeft} day${daysLeft!==1?'s':''}
+          </div>
+          <span class="material-icons-round" style="color:#1e88e5;font-size:16px">chevron_right</span>
+        </div>`;
+    } else {
+      indicator.style.display='none';
+    }
+  }
+}
+
+// Log a missed month investment
+function logMissed(recurringId, monthKey) {
+  const r = S.recurringInv.find(x=>x.id===recurringId); if(!r) return;
+  const day = String(r.dayOfMonth).padStart(2,'0');
+  const mo  = monthKey.slice(5,7);
+  const yr  = monthKey.slice(0,4);
+  S.investments.push({id:uid(),type:r.type,label:r.label,amount:r.amount,
+    date:`${yr}-${mo}-${day}`,notes:'Recurring (backdated)',createdAt:new Date().toISOString()});
+  // Mark this month as confirmed by advancing lastConfirmedMonth
+  // Only advance if monthKey is after current lastConfirmedMonth
+  if (!r.lastConfirmedMonth || monthKey > r.lastConfirmedMonth) {
+    r.lastConfirmedMonth = monthKey;
+  }
+  persist(); checkRecurringPending(); renderHome();
+  toast(`${r.label} logged for ${FMONTHS[parseInt(mo)-1]}`, 'ok');
+}
+
+// Skip a missed month (mark as intentionally skipped)
+function skipMissed(recurringId, monthKey) {
+  const r = S.recurringInv.find(x=>x.id===recurringId); if(!r) return;
+  if (!r.lastConfirmedMonth || monthKey > r.lastConfirmedMonth) {
+    r.lastConfirmedMonth = monthKey;
+  }
+  persist(); checkRecurringPending();
+  toast('Skipped');
+}
+
+// Open confirm sheet
+function openRecurringConfirm() {
+  const pending = getPendingRecurring();
+  if (!pending.length) return;
+  const sym = CUR[S.settings.currency]||'₹';
+  document.getElementById('recurringConfirmBody').innerHTML = pending.map(r=>{
+    const t = invType(r.type);
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;
+      border-bottom:1px solid var(--surface-3)" id="rc-${r.id}">
+      <div style="width:40px;height:40px;border-radius:10px;background:#e8f5e9;
+        display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${t.emoji}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500">${r.label||t.name}</div>
+        <div style="font-size:11px;color:var(--ink-3);margin-top:2px">${t.name} · every ${r.dayOfMonth}th</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:15px;font-weight:700;font-family:'DM Mono',monospace;color:var(--green)">${fmt(r.amount)}</div>
+        <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end">
+          <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px"
+            onclick="editRecurringBeforeConfirm('${r.id}')">Edit</button>
+          <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;background:var(--green)"
+            onclick="confirmOneRecurring('${r.id}')">✓</button>
+          <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px;color:var(--ink-3)"
+            onclick="skipOneRecurring('${r.id}')">Skip</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  openSheet('recurringConfirmSheet');
+}
+
+function confirmOneRecurring(id) {
+  const r = S.recurringInv.find(x=>x.id===id); if(!r) return;
+  const key = currentMonthKey();
+  // Log the investment for this month at dayOfMonth
+  const day = String(r.dayOfMonth).padStart(2,'0');
+  const mo  = String(S.month+1).padStart(2,'0');
+  const date = `${S.year}-${mo}-${day}`;
+  S.investments.push({id:uid(),type:r.type,label:r.label,amount:r.amount,date,notes:'Recurring',createdAt:new Date().toISOString()});
+  r.lastConfirmedMonth = key;
+  persist();
+  // Remove from confirm sheet
+  document.getElementById('rc-'+id)?.remove();
+  toast(`${r.label||invType(r.type).name} confirmed ✓`,'ok');
+  // If no more pending, close sheet
+  if (!getPendingRecurring().length) { closeSheet('recurringConfirmSheet'); checkRecurringPending(); renderHome(); }
+}
+
+function skipOneRecurring(id) {
+  const r = S.recurringInv.find(x=>x.id===id); if(!r) return;
+  r.lastConfirmedMonth = currentMonthKey(); // mark as handled (skipped)
+  persist();
+  document.getElementById('rc-'+id)?.remove();
+  toast('Skipped for this month');
+  if (!getPendingRecurring().length) { closeSheet('recurringConfirmSheet'); checkRecurringPending(); }
+}
+
+function confirmAllRecurring() {
+  const pending = getPendingRecurring();
+  pending.forEach(r => {
+    const key = currentMonthKey();
+    const day = String(r.dayOfMonth).padStart(2,'0');
+    const mo  = String(S.month+1).padStart(2,'0');
+    S.investments.push({id:uid(),type:r.type,label:r.label,amount:r.amount,date:`${S.year}-${mo}-${day}`,notes:'Recurring',createdAt:new Date().toISOString()});
+    r.lastConfirmedMonth = key;
+  });
+  persist();
+  closeSheet('recurringConfirmSheet');
+  checkRecurringPending();
+  renderHome();
+  toast(`${pending.length} investment${pending.length!==1?'s':''} confirmed ✓`,'ok');
+}
+
+let _editRecurringId = null;
+function editRecurringBeforeConfirm(id) {
+  const r = S.recurringInv.find(x=>x.id===id); if(!r) return;
+  _editRecurringId = id;
+  // Pre-fill investment sheet with recurring template values
+  closeSheet('recurringConfirmSheet');
+  setTimeout(()=>{
+    openInvSheet(null);
+    document.getElementById('invLabel').value = r.label||'';
+    document.getElementById('invAmt').value   = r.amount;
+    const mo  = String(S.month+1).padStart(2,'0');
+    const day = String(r.dayOfMonth).padStart(2,'0');
+    document.getElementById('invDate').value  = `${S.year}-${mo}-${day}`;
+    // Set type chip
+    document.querySelectorAll('#invTypeChips .chip').forEach(c=>{
+      c.classList.toggle('sel', c.dataset.id===r.type);
+    });
+    document.getElementById('saveInvBtn').textContent='Confirm';
+    document.getElementById('saveInvBtn').onclick = () => confirmEditedRecurring(id);
+  }, 300);
+}
+
+function confirmEditedRecurring(recurringId) {
+  const r = S.recurringInv.find(x=>x.id===recurringId); if(!r) return;
+  const amt   = parseFloat(document.getElementById('invAmt').value);
+  const label = document.getElementById('invLabel').value.trim();
+  const date  = document.getElementById('invDate').value;
+  const type  = getSelInvType();
+  const notes = document.getElementById('invNotes').value.trim();
+  if (!amt||amt<=0){toast('Enter valid amount','err');return;}
+  S.investments.push({id:uid(),type,label,amount:amt,date,notes:notes||'Recurring',createdAt:new Date().toISOString()});
+  r.lastConfirmedMonth = currentMonthKey();
+  persist();
+  closeSheet('invSheet');
+  checkRecurringPending();
+  renderHome();
+  toast('Confirmed ✓','ok');
+}
+
+// Dismiss advance warning for today only
+function dismissRecurringReminder(recurringId) {
+  const today = new Date().toISOString().slice(0,10);
+  localStorage.setItem(`sw2_remind_dismissed_${recurringId}_${today}`, '1');
+  checkRecurringPending();
+}
+
+function gotItAdvance(recurringId) {
+  dismissRecurringReminder(recurringId);
+  // Remove from sheet
+  document.getElementById('rc-adv-'+recurringId)?.remove();
+  // If no more items in sheet, close it
+  const remaining = document.querySelectorAll('[id^="rc-adv-"]');
+  if (!remaining.length) closeSheet('advanceWarningSheet');
+}
+function openAdvanceWarning() {
+  const today = new Date().toISOString().slice(0,10);
+  const upcoming = getUpcomingRecurring().filter(r =>
+    !localStorage.getItem(`sw2_remind_dismissed_${r.id}_${today}`)
+  );
+  if (!upcoming.length) return;
+  document.getElementById('advanceWarningBody').innerHTML = upcoming.map(r=>{
+    const t = invType(r.type);
+    const daysLeft = r.dayOfMonth - new Date().getDate();
+    return `<div id="rc-adv-${r.id}" style="display:flex;align-items:flex-start;gap:14px;padding:14px 0;
+      border-bottom:1px solid var(--surface-3)">
+      <div style="width:44px;height:44px;border-radius:12px;background:#e3f2fd;
+        display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${t.emoji}</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:var(--ink)">${r.label||t.name}</div>
+        <div style="font-size:12px;color:var(--ink-3);margin-top:2px">${t.name}</div>
+        <div style="margin-top:8px;background:#e3f2fd;border-radius:var(--rsm);padding:8px 12px">
+          <div style="font-size:12px;color:#0d47a1;font-weight:600">
+            ⏰ Deducts in ${daysLeft} day${daysLeft!==1?'s':''} — on the ${r.dayOfMonth}th
+          </div>
+          <div style="font-size:11px;color:#1565c0;margin-top:3px">
+            Ensure ${fmt(r.amount)} is available in your account before the ${r.dayOfMonth}th
+          </div>
+        </div>
+      </div>
+      <button onclick="gotItAdvance('${r.id}')"
+        style="background:none;border:1px solid var(--border);border-radius:var(--rsm);
+        padding:4px 10px;font-size:11px;color:var(--ink-3);cursor:pointer;flex-shrink:0;margin-top:2px">
+        Got it
+      </button>
+    </div>`;
+  }).join('');
+  openSheet('advanceWarningSheet');
+}
+
+// Toggle recurring in investment sheet
+function toggleInvRecurring() {
+  const tog = document.getElementById('invRecurringToggle');
+  const row = document.getElementById('invDayRow');
+  const isOn = tog.classList.toggle('on');
+  row.style.display = isOn ? 'block' : 'none';
+}
+
+// Remind chip selector — prefix = 'inv' or 'make'
+function selRemindChip(el, prefix) {
+  const containerId = prefix==='inv' ? 'invRemindChips' : 'makeRemindChips';
+  const customRowId = prefix==='inv' ? 'invRemindCustomRow' : 'makeRemindCustomRow';
+  document.querySelectorAll(`#${containerId} .chip`).forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById(customRowId).style.display = el.dataset.val==='custom' ? 'block' : 'none';
+}
+
+// Get remind-from day from chips
+// Returns a day-of-month number (1-28) meaning "start showing reminder from this day"
+// Special: 'som' = 1, numeric = dayOfMonth - val, 0 = dayOfMonth (same day), custom = input
+function getRemindFromDay(prefix, dayOfMonth) {
+  const containerId = prefix==='inv' ? 'invRemindChips' : 'makeRemindChips';
+  const sel = document.querySelector(`#${containerId} .chip.sel`);
+  const val = sel?.dataset.val || 'som';
+  if (val === 'som') return 1;
+  if (val === 'custom') {
+    const customDay = parseInt(
+      document.getElementById(prefix==='inv' ? 'invRemindCustomDay' : 'makeRemindCustomDay').value
+    );
+    return customDay>=1&&customDay<=28 ? customDay : 1;
+  }
+  if (val === '0') return dayOfMonth; // on the day
+  return Math.max(dayOfMonth - parseInt(val), 1);
+}
+
+// ── Make Recurring (from existing investment entry) ──
+let _makeRecurringInv = null;
+function openMakeRecurring(invId) {
+  const inv = S.investments.find(i=>i.id===invId); if(!inv) return;
+  _makeRecurringInv = inv;
+  const t = invType(inv.type);
+  document.getElementById('makeRecurringPreview').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px">${t.emoji}</span>
+      <div>
+        <div style="font-size:14px;font-weight:600">${inv.label||t.name}</div>
+        <div style="font-size:12px;color:var(--ink-3);margin-top:2px">${t.name} · ${fmt(inv.amount)}</div>
+      </div>
+    </div>`;
+  // Pre-fill day from investment date
+  const day = parseInt(inv.date.slice(8,10));
+  document.getElementById('makeRecurringDay').value = Math.min(day, 28);
+  document.getElementById('makeRemindCustomRow').style.display='none';
+  document.querySelectorAll('#makeRemindChips .chip').forEach((c,i)=>c.classList.toggle('sel',i===0));
+  openSheet('makeRecurringSheet');
+}
+
+function saveMakeRecurring() {
+  const inv = _makeRecurringInv; if(!inv) return;
+  const day = parseInt(document.getElementById('makeRecurringDay').value);
+  if(!day||day<1||day>28){toast('Enter a day between 1 and 28','err');return;}
+  const remindFromDay = getRemindFromDay('make', day);
+  const existing = S.recurringInv.find(r=>r.label===inv.label&&r.type===inv.type);
+  if (existing) { toast('Already set as recurring','err'); closeSheet('makeRecurringSheet'); return; }
+  S.recurringInv.push({
+    id: uid(), type: inv.type, label: inv.label||invType(inv.type).name,
+    amount: inv.amount, dayOfMonth: day, remindFromDay, active: true,
+    lastConfirmedMonth: currentMonthKey()
+  });
+  persist();
+  closeSheet('makeRecurringSheet');
+  renderInvestments();
+  toast('Set as recurring ✓','ok');
+}
+
+// ── Auto-detect recurring suggestion ──
+function detectRecurringSuggestions() {
+  // Find investment labels appearing in 2+ different months, not already recurring
+  const labelMonths = {};
+  S.investments.forEach(i=>{
+    if(!i.label) return;
+    const key = i.date.slice(0,7);
+    if(!labelMonths[i.label]) labelMonths[i.label]={months:new Set(),inv:i};
+    labelMonths[i.label].months.add(key);
+  });
+  const alreadyRecurring = new Set(S.recurringInv.map(r=>r.label));
+  return Object.entries(labelMonths)
+    .filter(([label,d])=>d.months.size>=2&&!alreadyRecurring.has(label))
+    .map(([label,d])=>({label,inv:d.inv}));
+}
+
 // ── INCOME NUDGE ───────────────────────────────
 function checkIncomeNudge() {
   // Already dismissed or income already set — never show
@@ -3317,6 +3869,12 @@ function renderInvestments() {
     grouped[key].items.push(i); grouped[key].total+=i.amount;
   });
 
+  // Auto-detect recurring suggestions
+  const suggestions = detectRecurringSuggestions();
+
+  // Set of recurring labels for badge display
+  const recurringLabels = new Set(S.recurringInv.map(r=>r.label));
+
   document.getElementById('invBody').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div class="stat-card" style="--accent:var(--green)">
@@ -3330,6 +3888,56 @@ function renderInvestments() {
         <div class="stat-sub">${allInv.length} total</div>
       </div>
     </div>
+
+    ${S.recurringInv.length?`
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head">
+        <span class="card-title">🔁 Recurring</span>
+        <span style="font-size:11px;color:var(--ink-3)">${S.recurringInv.filter(r=>r.active).length} active${S.recurringInv.filter(r=>!r.active).length?' · '+S.recurringInv.filter(r=>!r.active).length+' paused':''}</span>
+      </div>
+      <div class="card-body">
+        ${S.recurringInv.map(r=>{
+          const t=invType(r.type);
+          return `<div class="exp-item" style="border-bottom:1px solid var(--surface-3);opacity:${r.active?1:.5}">
+            <div class="exp-icon" style="background:${r.active?'#e8f5e9':'var(--surface-3)'};font-size:20px">${t.emoji}</div>
+            <div class="exp-info">
+              <div class="exp-name">${r.label||t.name}
+                ${!r.active?`<span style="font-size:10px;background:var(--surface-3);color:var(--ink-3);border-radius:8px;padding:1px 6px;margin-left:5px;font-weight:600">Paused</span>`:''}
+              </div>
+              <div class="exp-meta">${t.name} · every ${r.dayOfMonth}th of month · ${fmt(r.amount)}</div>
+            </div>
+            <div class="exp-right">
+              <div class="exp-actions">
+                <button onclick="togglePauseRecurring('${r.id}')"
+                  title="${r.active?'Pause':'Resume'}"
+                  style="color:${r.active?'var(--ink-3)':'var(--green)'}">
+                  <span class="material-icons-round">${r.active?'pause':'play_arrow'}</span>
+                </button>
+                <button onclick="delRecurring('${r.id}')" class="del">
+                  <span class="material-icons-round">delete</span>
+                </button>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`:''}
+
+    ${suggestions.length?`
+    <div style="background:#fff8e1;border-left:4px solid var(--yellow);border-radius:var(--rsm);
+      padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:8px">
+        💡 Looks recurring — set up auto-reminders?
+      </div>
+      ${suggestions.map(s=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;
+          padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+          <span style="font-size:13px;color:var(--ink-2)">${s.inv.label||invType(s.inv.type).name}</span>
+          <button class="btn btn-ghost" style="padding:4px 10px;font-size:12px"
+            onclick="openMakeRecurring('${s.inv.id}')">Make recurring</button>
+        </div>`).join('')}
+    </div>`:''}
+
     ${typeSorted.length?`
     <div class="card" style="margin-bottom:14px">
       <div class="card-head"><span class="card-title">By Type · ${MONTHS[S.month]}</span></div>
@@ -3354,15 +3962,19 @@ function renderInvestments() {
         <div class="card-body">
           ${g.items.map(i=>{
             const t=invType(i.type);
+            const isRec=recurringLabels.has(i.label);
             return `<div class="exp-item" style="border-bottom:1px solid var(--surface-3)">
               <div class="exp-icon" style="background:#e8f5e9;font-size:20px">${t.emoji}</div>
               <div class="exp-info">
-                <div class="exp-name">${i.label||t.name}</div>
-                <div class="exp-meta">${t.name} · ${new Date(i.date+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}${i.notes?' · '+i.notes:''}</div>
+                <div class="exp-name">${i.label||t.name}${isRec?'<span style="font-size:10px;background:#e8f5e9;color:var(--green);border-radius:8px;padding:1px 6px;margin-left:5px;font-weight:700">🔁</span>':''}</div>
+                <div class="exp-meta">${t.name} · ${new Date(i.date+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}${i.notes&&i.notes!=='Recurring'?' · '+i.notes:''}</div>
               </div>
               <div class="exp-right">
                 <div class="exp-amt" style="color:var(--green)">${fmt(i.amount)}</div>
                 <div class="exp-actions">
+                  ${!isRec?`<button onclick="openMakeRecurring('${i.id}')" title="Make recurring" style="color:var(--green)">
+                    <span class="material-icons-round">repeat</span>
+                  </button>`:''}
                   <button onclick="delInv('${i.id}')" class="del"><span class="material-icons-round">delete</span></button>
                 </div>
               </div>
@@ -3373,16 +3985,34 @@ function renderInvestments() {
     :`<div class="empty"><span class="material-icons-round">trending_up</span><p>No investments logged yet.<br>Tap + to add your first.</p></div>`}`;
 }
 
+function togglePauseRecurring(id) {
+  const r=S.recurringInv.find(x=>x.id===id); if(!r) return;
+  r.active=!r.active;
+  persist(); renderInvestments();
+  toast(r.active?'Resumed ✓':'Paused', r.active?'ok':'');
+}
+function delRecurring(id) {
+  S.recurringInv=S.recurringInv.filter(r=>r.id!==id);
+  persist(); renderInvestments(); toast('Recurring deleted');
+}
+
 let _invEditId = null;
 function openInvSheet(editId) {
   _invEditId = editId||null;
   document.getElementById('invSheetTitle').textContent = editId?'Edit Investment':'Add Investment';
   document.getElementById('saveInvBtn').textContent = editId?'Save':'Add Investment';
+  document.getElementById('saveInvBtn').onclick = saveInv;
   document.getElementById('invAmt').value='';
   document.getElementById('invDate').value=new Date().toISOString().slice(0,10);
   document.getElementById('invLabel').value='';
   document.getElementById('invNotes').value='';
   document.getElementById('invAmtSym').textContent=CUR[S.settings.currency]||'₹';
+  // Reset recurring toggle
+  document.getElementById('invRecurringToggle').classList.remove('on');
+  document.getElementById('invDayRow').style.display='none';
+  document.getElementById('invDayOfMonth').value='';
+  document.getElementById('invRemindCustomRow').style.display='none';
+  document.querySelectorAll('#invRemindChips .chip').forEach((c,i)=>c.classList.toggle('sel',i===0));
   // Type chips
   let selType = 'sip';
   if (editId) {
@@ -3400,22 +4030,34 @@ function selInvType(id,el){
 }
 function getSelInvType(){return document.querySelector('#invTypeChips .chip.sel')?.dataset.id||'other';}
 function saveInv(){
-  const amt=parseFloat(document.getElementById('invAmt').value);
-  const date=document.getElementById('invDate').value;
-  const label=document.getElementById('invLabel').value.trim();
-  const notes=document.getElementById('invNotes').value.trim();
-  const type=getSelInvType();
+  const amt   = parseFloat(document.getElementById('invAmt').value);
+  const date  = document.getElementById('invDate').value;
+  const label = document.getElementById('invLabel').value.trim();
+  const notes = document.getElementById('invNotes').value.trim();
+  const type  = getSelInvType();
+  const isRecurring = document.getElementById('invRecurringToggle').classList.contains('on');
+  const dayVal = parseInt(document.getElementById('invDayOfMonth').value);
   if(!amt||amt<=0){toast('Enter valid amount','err');return;}
   if(!date){toast('Pick a date','err');return;}
+  if(isRecurring&&(!dayVal||dayVal<1||dayVal>28)){toast('Enter a day between 1 and 28','err');return;}
+  const remindFromDay = isRecurring ? getRemindFromDay('inv', dayVal) : 1;
+
   if(_invEditId){
     const i=S.investments.findIndex(x=>x.id===_invEditId);
     if(i>-1) S.investments[i]={...S.investments[i],type,label,amount:amt,date,notes};
     toast('Updated','ok');
   } else {
     S.investments.push({id:uid(),type,label,amount:amt,date,notes,createdAt:new Date().toISOString()});
-    toast('Investment added ✓','ok');
+    if(isRecurring) {
+      S.recurringInv.push({
+        id:uid(),type,label:label||invType(type).name,amount:amt,
+        dayOfMonth:dayVal, remindFromDay, active:true,
+        lastConfirmedMonth:currentMonthKey()
+      });
+    }
+    toast(isRecurring?'Investment added + recurring set ✓':'Investment added ✓','ok');
   }
-  persist(); closeSheet('invSheet'); renderInvestments();
+  persist(); closeSheet('invSheet'); renderInvestments(); checkRecurringPending();
 }
 function delInv(id){
   S.investments=S.investments.filter(i=>i.id!==id);
@@ -4339,35 +4981,60 @@ function checkAndFireReminder() {
   if (!S.settings.notif) return;
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
-  const now        = new Date();
-  const today      = now.toISOString().slice(0,10);
-  const remHour    = S.settings.reminderHour   ?? 21;
-  const remMinute  = S.settings.reminderMinute ?? 0;
+  const now       = new Date();
+  const today     = now.toISOString().slice(0,10);
+  const remHour   = S.settings.reminderHour   ?? 21;
+  const remMinute = S.settings.reminderMinute ?? 0;
 
-  // Already notified today? Don't double-fire
-  const lastFired = localStorage.getItem('sw2_last_notif');
-  if (lastFired === today) return;
-
-  // Past reminder time today?
   const isPastReminderTime = now.getHours() > remHour ||
     (now.getHours() === remHour && now.getMinutes() >= remMinute);
-  if (!isPastReminderTime) return;
 
-  // Already logged today?
-  const loggedToday = S.expenses.some(e => e.date === today);
-  if (loggedToday) return;
+  // ── Expense reminder ──
+  const lastFired = localStorage.getItem('sw2_last_notif');
+  if (lastFired !== today && isPastReminderTime) {
+    const loggedToday = S.expenses.some(e => e.date === today);
+    if (!loggedToday) {
+      const notif = new Notification('Spendwise 💰', {
+        body: "Don't forget to log today's expenses!",
+        icon: './icon-192.png', badge: './icon-192.png',
+        tag: 'daily-reminder', requireInteraction: false,
+      });
+      notif.onclick = () => { window.focus(); notif.close(); };
+      localStorage.setItem('sw2_last_notif', today);
+    }
+  }
 
-  // Fire!
-  const notif = new Notification('Spendwise 💰', {
-    body: "Don't forget to log today's expenses!",
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    tag: 'daily-reminder',
-    requireInteraction: false,
+  // ── Recurring investment advance warning notification ──
+  // Fires once per day per recurring template when in remind window
+  const upcoming = getUpcomingRecurring();
+  upcoming.forEach(r => {
+    const notifKey = `sw2_inv_notif_${r.id}_${today}`;
+    if (localStorage.getItem(notifKey)) return; // already fired today
+    const t = invType(r.type);
+    const daysLeft = r.dayOfMonth - now.getDate();
+    const notif = new Notification('Spendwise — Investment Reminder 📅', {
+      body: `${r.label||t.name} of ${fmt(r.amount)} deducts in ${daysLeft} day${daysLeft!==1?'s':''}. Ensure funds are ready.`,
+      icon: './icon-192.png', badge: './icon-192.png',
+      tag: `inv-reminder-${r.id}`, requireInteraction: false,
+    });
+    notif.onclick = () => { window.focus(); notif.close(); };
+    localStorage.setItem(notifKey, '1');
   });
 
-  notif.onclick = () => { window.focus(); notif.close(); };
-  localStorage.setItem('sw2_last_notif', today);
+  // ── Recurring investment due notification (on/after date) ──
+  const pending = getPendingRecurring();
+  pending.forEach(r => {
+    const notifKey = `sw2_inv_due_${r.id}_${currentMonthKey()}`;
+    if (localStorage.getItem(notifKey)) return;
+    const t = invType(r.type);
+    const notif = new Notification('Spendwise — Log Investment 📋', {
+      body: `${r.label||t.name} of ${fmt(r.amount)} — tap to log this month.`,
+      icon: './icon-192.png', badge: './icon-192.png',
+      tag: `inv-due-${r.id}`, requireInteraction: false,
+    });
+    notif.onclick = () => { window.focus(); notif.close(); };
+    localStorage.setItem(notifKey, '1');
+  });
 }
 
 // Also check in-page reminder banner (separate from push)
@@ -4376,7 +5043,7 @@ async function clearData() {
 
   // Wipe all app data from localStorage (keep sw2_seeded so sample data never returns)
   localStorage.removeItem('sw2');
-  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; S.smsQueue=[]; S.customSubs={}; S.investments=[]; S.migrationDone=false;
+  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; S.smsQueue=[]; S.customSubs={}; S.investments=[]; S.recurringInv=[]; S.migrationDone=false;
   persist();
 
   // Tell SW to drop its cache so the fresh page loads from network on next open
