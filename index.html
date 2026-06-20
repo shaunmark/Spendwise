@@ -605,6 +605,10 @@ body {
     </div>
     <!-- Income allocation — only shows if income set -->
     <div id="incomeAllocationCard" style="display:none;margin-bottom:14px"></div>
+    <!-- Budget card — only shows if spend budget set -->
+    <div id="budgetCard" style="display:none;margin-bottom:14px"></div>
+    <!-- Carry-forward month-start banner -->
+    <div id="carryForwardBanner" style="display:none;margin-bottom:14px"></div>
     <!-- Recurring urgent banners (missed + due) -->
     <div id="recurringPendingBanner" style="display:none;margin-bottom:14px"></div>
     <!-- Advance warning indicator — tappable, opens sheet -->
@@ -863,7 +867,7 @@ body {
         <div class="toggle-wrap">
           <div class="toggle-info">
             <h4>Monthly Income</h4>
-            <p>Used to show invest/spend ratio in Investments</p>
+            <p>Used to show invest/spend ratio on Home</p>
           </div>
           <div class="input-wrap" style="width:130px">
             <span class="input-prefix-sym" id="incomeSymLabel">₹</span>
@@ -872,6 +876,35 @@ body {
               placeholder="Optional" min="0" inputmode="decimal"
               onchange="saveIncome()">
           </div>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <h4>Monthly Spend Budget</h4>
+            <p id="budgetDesc">Max you plan to spend each month</p>
+          </div>
+          <div class="input-wrap" style="width:130px">
+            <span class="input-prefix-sym" id="budgetSymLabel">₹</span>
+            <input type="number" class="form-input" id="budgetInput"
+              style="padding:8px 10px 8px 28px;font-size:14px"
+              placeholder="Optional" min="0" inputmode="decimal"
+              onchange="saveBudget()">
+          </div>
+        </div>
+        <!-- Budget suggestion nudge -->
+        <div id="budgetSuggestionRow" style="display:none;margin:-8px 0 8px;
+          background:var(--primary-light);border-radius:var(--rsm);padding:10px 14px;
+          font-size:12px;color:var(--primary);display:none;align-items:center;gap:8px">
+          <span class="material-icons-round" style="font-size:16px">tips_and_updates</span>
+          <span id="budgetSuggestionText" style="flex:1"></span>
+          <button class="btn btn-primary" style="padding:4px 12px;font-size:12px"
+            id="budgetSuggestionBtn" onclick="applyBudgetSuggestion()">Use this</button>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <h4>Carry-forward overspend</h4>
+            <p>Overspending this month reduces next month's budget</p>
+          </div>
+          <div class="toggle" id="carryForwardToggle" onclick="toggleCarryForward()"></div>
         </div>
       </div>
       <div class="settings-section">
@@ -1385,7 +1418,11 @@ const S = {
   smsQueue: [],
   investments: [],      // {id, amount, type, label, date, notes, createdAt}
   recurringInv: [],     // {id, type, label, amount, dayOfMonth, active, lastConfirmedMonth}
-  settings: { currency: 'INR', notif: false, categoryMode: 'simple', income: null },
+  settings: { currency: 'INR', notif: false, categoryMode: 'simple', income: null, spendBudget: null, carryForward: true },
+  carryForwardAmount: 0,     // current debt carried into this month
+  carryForwardMonth:  null,  // 'YYYY-MM' last calculated
+  surplusTotal:       0,     // cumulative unspent budget
+  surplusHistory:     [],    // [{month:'YYYY-MM', amount}]
   month: new Date().getMonth(),
   year:  new Date().getFullYear(),
   editId: null,
@@ -1527,8 +1564,12 @@ function load() {
   S.customSubs    = (d.customSubs && typeof d.customSubs==='object') ? d.customSubs : {};
   S.cards         = Array.isArray(d.cards)         ? d.cards        : [];
   S.smsQueue      = Array.isArray(d.smsQueue)      ? d.smsQueue     : [];
-  S.investments   = Array.isArray(d.investments)   ? d.investments  : [];
-  S.recurringInv  = Array.isArray(d.recurringInv)  ? d.recurringInv : [];
+  S.investments      = Array.isArray(d.investments)    ? d.investments    : [];
+  S.recurringInv     = Array.isArray(d.recurringInv)   ? d.recurringInv   : [];
+  S.carryForwardAmount = typeof d.carryForwardAmount === 'number' ? d.carryForwardAmount : 0;
+  S.carryForwardMonth  = d.carryForwardMonth || null;
+  S.surplusTotal       = typeof d.surplusTotal === 'number' ? d.surplusTotal : 0;
+  S.surplusHistory     = Array.isArray(d.surplusHistory) ? d.surplusHistory : [];
   // migrationV2 = savings migration. Use versioned key so old buggy 'migrationDone' doesn't block it.
   S.migrationDone = !!d.migrationV2;
   S.settings      = { ...S.settings, ...(d.settings||{}) };
@@ -1560,6 +1601,10 @@ function persist() {
     customSubs: S.customSubs, cards: S.cards,
     smsQueue: S.smsQueue, investments: S.investments,
     recurringInv: S.recurringInv,
+    carryForwardAmount: S.carryForwardAmount,
+    carryForwardMonth:  S.carryForwardMonth,
+    surplusTotal:       S.surplusTotal,
+    surplusHistory:     S.surplusHistory,
     migrationV2: S.migrationDone, settings: S.settings
   }));
 }
@@ -1670,9 +1715,245 @@ function checkReminder() {
 }
 
 // ── HOME ───────────────────────────────────────
+// ── BUDGET & CARRY-FORWARD ─────────────────────
+
+// Calculate carry-forward on app open — runs once per month
+function calcCarryForward() {
+  if (!S.settings.spendBudget || !S.settings.carryForward) return;
+  const cur = currentMonthKey();
+  if (S.carryForwardMonth === cur) return; // already calculated this month
+
+  // Calculate last month's spend
+  let lm = S.month-1, ly = S.year;
+  if (lm < 0) { lm = 11; ly--; }
+  const lastKey = `${ly}-${String(lm+1).padStart(2,'0')}`;
+
+  // Only calculate if we have a previous month to look at
+  if (!S.carryForwardMonth && !S.surplusHistory.length) {
+    // First time — just mark current month as calculated, start fresh
+    S.carryForwardMonth = cur;
+    persist(); return;
+  }
+
+  const lastExps = S.expenses.filter(e => {
+    const d = new Date(e.date);
+    return d.getMonth()===lm && d.getFullYear()===ly &&
+      (!e.excluded || !['investment','reimbursable'].includes(e.excludeReason));
+  });
+  const lastSpend = lastExps.reduce((s,e)=>s+e.amount, 0);
+
+  // Effective budget last month = spendBudget - whatever carry-forward was applied
+  // (We already stored the carry-forward that was applied, so just use base budget)
+  const effectiveLast = S.settings.spendBudget;
+  const diff = lastSpend - effectiveLast; // positive = overspend, negative = surplus
+
+  if (diff > 0) {
+    // Overspent — carry forward deficit
+    S.carryForwardAmount = diff;
+    // Show month-start banner
+    localStorage.setItem('sw2_cf_banner', lastKey);
+  } else if (diff < 0) {
+    // Underspent — add to surplus pot
+    const surplus = Math.abs(diff);
+    S.surplusTotal += surplus;
+    S.surplusHistory.unshift({ month: lastKey, amount: surplus });
+    S.carryForwardAmount = 0;
+  } else {
+    S.carryForwardAmount = 0;
+  }
+
+  S.carryForwardMonth = cur;
+  persist();
+}
+
+// Effective budget this month = spendBudget - carryForwardAmount
+function effectiveBudget() {
+  if (!S.settings.spendBudget) return null;
+  return Math.max(S.settings.spendBudget - S.carryForwardAmount, 0);
+}
+
+// Render budget card on home
+function renderBudgetCard() {
+  const budgetEl = document.getElementById('budgetCard');
+  const budget = effectiveBudget();
+  if (!budget) { budgetEl.style.display='none'; return; }
+
+  const sym = CUR[S.settings.currency]||'₹';
+  const allMonthExps = S.expenses.filter(e=>{
+    const d=new Date(e.date); return d.getMonth()===S.month&&d.getFullYear()===S.year;
+  });
+  const spent = allMonthExps
+    .filter(e=>!e.excluded||!['investment','reimbursable'].includes(e.excludeReason))
+    .reduce((s,e)=>s+e.amount, 0);
+
+  const remaining = budget - spent;
+  const pct = Math.min((spent/budget)*100, 100);
+  const isOver = spent > budget;
+  const overAmt = Math.max(spent - budget, 0);
+
+  // Days remaining in month
+  const today = new Date();
+  const daysInMonth = new Date(S.year, S.month+1, 0).getDate();
+  const daysLeft = daysInMonth - today.getDate();
+
+  // Color thresholds
+  const barColor = isOver ? 'var(--red)'
+    : pct >= 90 ? '#f4511e'
+    : pct >= 70 ? 'var(--yellow)'
+    : 'var(--green)';
+
+  // Surplus section
+  const showSurplus = S.surplusTotal > 0;
+  const [surplusExpanded, setSurplusExpanded] = [false, null]; // state via DOM
+
+  budgetEl.style.display='block';
+  budgetEl.innerHTML=`
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Monthly Budget</span>
+        <span style="font-size:11px;color:var(--ink-3)">
+          ${S.carryForwardAmount>0?`${sym}${Math.round(S.carryForwardAmount).toLocaleString('en-IN')} carry-forward · `:''}
+          ${sym}${Math.round(budget).toLocaleString('en-IN')} effective
+        </span>
+      </div>
+      <div class="card-body">
+        ${isOver?`
+        <div style="background:#fce8e6;border-radius:var(--rsm);padding:8px 12px;margin-bottom:10px;
+          display:flex;align-items:center;gap:8px;font-size:12px">
+          <span class="material-icons-round" style="color:var(--red);font-size:16px">warning</span>
+          <span style="color:#c62828;font-weight:600">Over budget by ${fmt(overAmt)}
+            ${S.settings.carryForward?' — carries to next month':''}
+          </span>
+        </div>`:''}
+
+        <!-- Progress bar -->
+        <div style="height:12px;background:var(--surface-3);border-radius:6px;overflow:hidden;margin-bottom:8px">
+          <div style="height:100%;width:${pct.toFixed(1)}%;background:${barColor};
+            border-radius:6px;transition:width .5s"></div>
+        </div>
+
+        <!-- Stats row -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div>
+            <span style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace;
+              color:${isOver?'var(--red)':'var(--ink)'}">${fmt(spent)}</span>
+            <span style="font-size:12px;color:var(--ink-3)"> of ${fmt(budget)}</span>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:13px;font-weight:700;color:${isOver?'var(--red)':barColor}">
+              ${isOver?'–'+fmt(overAmt)+' over':fmt(remaining)+' left'}
+            </div>
+            <div style="font-size:10px;color:var(--ink-3)">${daysLeft} day${daysLeft!==1?'s':''} remaining</div>
+          </div>
+        </div>
+
+        <!-- % label -->
+        <div style="font-size:11px;color:${barColor};font-weight:600;margin-bottom:${showSurplus?'12px':'0'}">
+          ${pct.toFixed(0)}% used
+          ${!isOver&&pct>=70&&pct<90?' · Getting close':''}
+          ${!isOver&&pct>=90?' · Almost at limit':''}
+        </div>
+
+        ${showSurplus?`
+        <!-- Surplus pot -->
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer"
+            onclick="toggleSurplusHistory()">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:14px">💰</span>
+              <span style="font-size:12px;font-weight:600;color:var(--ink-2)">Surplus</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:13px;font-weight:700;font-family:'DM Mono',monospace;color:var(--green)">${fmt(S.surplusTotal)}</span>
+              <span class="material-icons-round" id="surplusChevron" style="font-size:16px;color:var(--ink-3);transition:transform .2s">expand_more</span>
+            </div>
+          </div>
+          <div id="surplusHistory" style="display:none;margin-top:8px">
+            <div style="font-size:11px;color:var(--ink-3);margin-bottom:6px">Unspent budget accumulated over time</div>
+            ${S.surplusHistory.slice(0,6).map(h=>`
+              <div style="display:flex;justify-content:space-between;padding:4px 0;
+                border-bottom:1px solid var(--surface-3);font-size:12px">
+                <span style="color:var(--ink-2)">${FMONTHS[parseInt(h.month.slice(5,7))-1]} ${h.month.slice(0,4)}</span>
+                <span style="font-weight:600;color:var(--green);font-family:'DM Mono',monospace">+${fmt(h.amount)}</span>
+              </div>`).join('')}
+            ${S.surplusHistory.length>6?`<div style="font-size:11px;color:var(--ink-3);padding-top:4px">+${S.surplusHistory.length-6} more months</div>`:''}
+          </div>
+        </div>`:''}
+      </div>
+    </div>`;
+}
+
+function toggleSurplusHistory() {
+  const el = document.getElementById('surplusHistory');
+  const ch = document.getElementById('surplusChevron');
+  if (!el) return;
+  const open = el.style.display==='block';
+  el.style.display = open?'none':'block';
+  if(ch) ch.style.transform = open?'':'rotate(180deg)';
+}
+
+// Carry-forward month-start banner
+function renderCarryForwardBanner() {
+  const el = document.getElementById('carryForwardBanner');
+  if (!el) return;
+  const shownKey = localStorage.getItem('sw2_cf_banner');
+  const cur = currentMonthKey();
+  // Show once per month — if cf_banner key matches last month
+  let lm=S.month-1, ly=S.year; if(lm<0){lm=11;ly--;}
+  const lastKey=`${ly}-${String(lm+1).padStart(2,'0')}`;
+  if (shownKey!==lastKey || !S.carryForwardAmount || !S.settings.carryForward) {
+    el.style.display='none'; return;
+  }
+  const sym=CUR[S.settings.currency]||'₹';
+  el.style.display='block';
+  el.innerHTML=`
+    <div style="background:#fff3e0;border-left:4px solid var(--yellow);border-radius:var(--rsm);
+      padding:12px 14px;display:flex;align-items:flex-start;gap:10px">
+      <span class="material-icons-round" style="color:var(--yellow);font-size:20px;flex-shrink:0;margin-top:1px">info</span>
+      <div style="flex:1;font-size:13px;color:#5d4037">
+        <strong>Last month you overspent by ${fmt(S.carryForwardAmount)}.</strong>
+        <div style="margin-top:2px;font-size:12px;color:#795548">
+          This month's effective budget is ${fmt(effectiveBudget())} 
+          (${fmt(S.settings.spendBudget)} − ${fmt(S.carryForwardAmount)}).
+        </div>
+      </div>
+      <button onclick="this.closest('[style]').style.display='none';localStorage.removeItem('sw2_cf_banner')"
+        style="background:none;border:none;cursor:pointer;color:var(--ink-3);flex-shrink:0">
+        <span class="material-icons-round" style="font-size:18px">close</span>
+      </button>
+    </div>`;
+}
+
+// Settings helpers
+function saveBudget() {
+  const val = parseFloat(document.getElementById('budgetInput').value);
+  S.settings.spendBudget = val>0 ? val : null;
+  persist(); renderHome(); toast('Budget updated','ok');
+}
+
+function toggleCarryForward() {
+  S.settings.carryForward = !S.settings.carryForward;
+  document.getElementById('carryForwardToggle').classList.toggle('on', S.settings.carryForward);
+  persist(); renderHome();
+}
+
+function applyBudgetSuggestion() {
+  const el = document.getElementById('budgetSuggestionBtn');
+  const suggested = parseInt(el.dataset.suggested);
+  if (!suggested) return;
+  document.getElementById('budgetInput').value = suggested;
+  S.settings.spendBudget = suggested;
+  persist(); renderHome();
+  document.getElementById('budgetSuggestionRow').style.display='none';
+  toast('Budget set to '+fmt(suggested),'ok');
+}
+
 function renderHome() {
+  calcCarryForward();
   checkReminder();
   checkIncomeNudge();
+  renderBudgetCard();
+  renderCarryForwardBanner();
   checkRecurringPending();
   const exps = moExp(S.month, S.year);
   const total = exps.reduce((s,e)=>s+e.amount,0);
@@ -4896,6 +5177,15 @@ function saveIncome() {
   S.settings.income = val>0 ? val : null;
   persist();
   if (S.settings.income) localStorage.setItem('sw2_income_nudge_done','1');
+  // Show budget suggestion if no budget set yet
+  if (S.settings.income && !S.settings.spendBudget) {
+    const suggested = Math.round(S.settings.income * 0.6);
+    const sym = CUR[S.settings.currency]||'₹';
+    document.getElementById('budgetSuggestionText').textContent =
+      `Based on your income, we suggest ${sym}${suggested.toLocaleString('en-IN')} (60% of income) as your monthly spend budget.`;
+    document.getElementById('budgetSuggestionBtn').dataset.suggested = suggested;
+    document.getElementById('budgetSuggestionRow').style.display='flex';
+  }
   toast('Income updated','ok');
   renderHome();
 }
@@ -4920,6 +5210,21 @@ function renderSettings() {
   // Income
   document.getElementById('incomeSymLabel').textContent = sym;
   document.getElementById('incomeInput').value = S.settings.income||'';
+  // Budget
+  document.getElementById('budgetSymLabel').textContent = sym;
+  document.getElementById('budgetInput').value = S.settings.spendBudget||'';
+  document.getElementById('carryForwardToggle').classList.toggle('on', !!S.settings.carryForward);
+  // Budget suggestion — show if income set but no budget set
+  const suggRow = document.getElementById('budgetSuggestionRow');
+  if (S.settings.income && !S.settings.spendBudget) {
+    const suggested = Math.round(S.settings.income * 0.6);
+    document.getElementById('budgetSuggestionText').textContent =
+      `Based on your income, we suggest ${sym}${suggested.toLocaleString('en-IN')} (60% of income) as your monthly spend budget.`;
+    document.getElementById('budgetSuggestionBtn').dataset.suggested = suggested;
+    suggRow.style.display='flex';
+  } else {
+    suggRow.style.display='none';
+  }
 }
 function toggleCatMode() {
   S.settings.categoryMode = isDetailed() ? 'simple' : 'detailed';
@@ -5043,7 +5348,7 @@ async function clearData() {
 
   // Wipe all app data from localStorage (keep sw2_seeded so sample data never returns)
   localStorage.removeItem('sw2');
-  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; S.smsQueue=[]; S.customSubs={}; S.investments=[]; S.recurringInv=[]; S.migrationDone=false;
+  S.expenses=[]; S.categories=[...DEFAULT_CATS]; S.cards=[]; S.smsQueue=[]; S.customSubs={}; S.investments=[]; S.recurringInv=[]; S.migrationDone=false; S.carryForwardAmount=0; S.carryForwardMonth=null; S.surplusTotal=0; S.surplusHistory=[];
   persist();
 
   // Tell SW to drop its cache so the fresh page loads from network on next open
