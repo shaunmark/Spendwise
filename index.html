@@ -654,7 +654,7 @@ body {
     <!-- Income nudge — shows once if income not set -->
     <div id="incomeNudge" style="display:none;background:#e8f0fe;border-left:4px solid var(--primary);
       border-radius:var(--rsm);padding:11px 14px;margin-bottom:14px;
-      display:none;align-items:flex-start;gap:10px;font-size:13px">
+      align-items:flex-start;gap:10px;font-size:13px">
       <span class="material-icons-round" style="color:var(--primary);font-size:18px;flex-shrink:0;margin-top:1px">tips_and_updates</span>
       <div style="flex:1">
         <strong style="color:var(--primary-dark)">Set your monthly income</strong>
@@ -1735,8 +1735,22 @@ function load() {
   S.recurringInv     = Array.isArray(d.recurringInv)   ? d.recurringInv   : [];
   S.carryForwardAmount = typeof d.carryForwardAmount === 'number' ? d.carryForwardAmount : 0;
   S.carryForwardMonth  = d.carryForwardMonth || null;
+  // Reset surplus if it looks like phantom data (no expense months matching surplus history)
   S.surplusTotal       = typeof d.surplusTotal === 'number' ? d.surplusTotal : 0;
   S.surplusHistory     = Array.isArray(d.surplusHistory) ? d.surplusHistory : [];
+  // Validate surplus history — remove entries where no expenses existed that month
+  S.surplusHistory = S.surplusHistory.filter(h => {
+    const [hy, hm] = h.month.split('-').map(Number);
+    return S.expenses.some(e => {
+      const d2 = new Date(e.date);
+      return d2.getFullYear()===hy && d2.getMonth()===hm-1;
+    });
+  });
+  S.surplusTotal = S.surplusHistory.reduce((s,h)=>s+h.amount, 0);
+  // Also reset carryForwardMonth so it recalculates cleanly
+  if (S.surplusTotal === 0 && d.surplusTotal > 0) {
+    S.carryForwardMonth = null;
+  }
   // migrationV2 = savings migration. Use versioned key so old buggy 'migrationDone' doesn't block it.
   S.migrationDone = !!d.migrationV2;
   const loaded = d.settings||{};
@@ -2064,8 +2078,8 @@ function applyFeatureFlags() {
     if (advanceBanner)   advanceBanner.style.display='none';
   }
 
-  // Re-render home and analytics to reflect changes
-  if (document.getElementById('page-home')?.classList.contains('active')) renderHome();
+  // Note: don't call renderHome() here — renderHome() calls applyFeatureFlags() which would cause recursion
+  // Analytics re-render
   if (document.getElementById('page-analytics')?.classList.contains('active')) {
     renderAnalyticsDashboard();
   }
@@ -2084,32 +2098,28 @@ function calcCarryForward() {
   if (lm < 0) { lm = 11; ly--; }
   const lastKey = `${ly}-${String(lm+1).padStart(2,'0')}`;
 
-  // Only calculate if we have a previous month to look at
-  if (!S.carryForwardMonth && !S.surplusHistory.length) {
-    // First time — just mark current month as calculated, start fresh
-    S.carryForwardMonth = cur;
-    persist(); return;
-  }
-
   const lastExps = S.expenses.filter(e => {
     const d = new Date(e.date);
     return d.getMonth()===lm && d.getFullYear()===ly &&
       (!e.excluded || !['investment','reimbursable'].includes(e.excludeReason));
   });
-  const lastSpend = lastExps.reduce((s,e)=>s+e.amount, 0);
 
-  // Effective budget last month = spendBudget - whatever carry-forward was applied
-  // (We already stored the carry-forward that was applied, so just use base budget)
+  // Skip entirely if no expenses logged last month — don't treat as underspending
+  // This prevents phantom surplus from months before user started using the app
+  if (!lastExps.length) {
+    S.carryForwardAmount = 0;
+    S.carryForwardMonth = cur;
+    persist(); return;
+  }
+
+  const lastSpend = lastExps.reduce((s,e)=>s+e.amount, 0);
   const effectiveLast = S.settings.spendBudget;
   const diff = lastSpend - effectiveLast; // positive = overspend, negative = surplus
 
   if (diff > 0) {
-    // Overspent — carry forward deficit
     S.carryForwardAmount = diff;
-    // Show month-start banner
     localStorage.setItem('sw2_cf_banner', lastKey);
   } else if (diff < 0) {
-    // Underspent — add to surplus pot
     const surplus = Math.abs(diff);
     S.surplusTotal += surplus;
     S.surplusHistory.unshift({ month: lastKey, amount: surplus });
@@ -2323,7 +2333,6 @@ function renderHome() {
   calcCarryForward();
   checkReminder();
   checkIncomeNudge();
-  applyFeatureFlags();
   renderBudgetCard();
   renderCarryForwardBanner();
   checkRecurringPending();
@@ -6620,6 +6629,7 @@ async function registerSW() {
     localStorage.setItem('sw2_seeded', '1');
   }
 
+  applyFeatureFlags();
   renderHome();
   checkAndFireReminder();
   registerSW();
